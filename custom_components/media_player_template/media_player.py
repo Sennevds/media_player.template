@@ -18,6 +18,7 @@ from homeassistant.components.media_player.const import (
     SUPPORT_TURN_ON,
     SUPPORT_VOLUME_MUTE,
     SUPPORT_VOLUME_STEP,
+    SUPPORT_SELECT_SOURCE,
 )
 from homeassistant.const import (
     ATTR_ENTITY_ID,
@@ -44,11 +45,11 @@ from homeassistant.helpers.event import async_track_state_change
 from homeassistant.helpers.script import Script
 
 from . import extract_entities, initialise_templates
-from .const import CONF_AVAILABILITY_TEMPLATE
+
 
 _LOGGER = logging.getLogger(__name__)
 _VALID_STATES = [STATE_ON, STATE_OFF, "true", "false", STATE_IDLE]
-
+CONF_AVAILABILITY_TEMPLATE = "availability_template"
 CONF_MEDIAPLAYER = "media_players"
 ON_ACTION = "turn_on"
 OFF_ACTION = "turn_off"
@@ -59,7 +60,8 @@ PREVIOUS_ACTION = "previous"
 VOLUME_UP_ACTION = "volume_up"
 VOLUME_DOWN_ACTION = "volume_down"
 MUTE_ACTION = "mute"
-CONF_INPUT_TEMPLATES = "input_templates"
+CURRENT_SOURCE_TEMPLATE = "current_source_template"
+CONF_INPUTS = "inputs"
 
 
 MEDIA_PLAYER_SCHEMA = vol.Schema(
@@ -68,6 +70,7 @@ MEDIA_PLAYER_SCHEMA = vol.Schema(
         vol.Optional(CONF_ICON_TEMPLATE): cv.template,
         vol.Optional(CONF_ENTITY_PICTURE_TEMPLATE): cv.template,
         vol.Optional(CONF_AVAILABILITY_TEMPLATE): cv.template,
+        vol.Optional(CURRENT_SOURCE_TEMPLATE): cv.template,
         vol.Required(ON_ACTION): cv.SCRIPT_SCHEMA,
         vol.Required(OFF_ACTION): cv.SCRIPT_SCHEMA,
         vol.Optional(PLAY_ACTION): cv.SCRIPT_SCHEMA,
@@ -77,9 +80,7 @@ MEDIA_PLAYER_SCHEMA = vol.Schema(
         vol.Optional(VOLUME_UP_ACTION): cv.SCRIPT_SCHEMA,
         vol.Optional(VOLUME_DOWN_ACTION): cv.SCRIPT_SCHEMA,
         vol.Optional(MUTE_ACTION): cv.SCRIPT_SCHEMA,
-        vol.Optional(CONF_INPUT_TEMPLATES, default={}): vol.Schema(
-            {cv.string: cv.SCRIPT_SCHEMA}
-        ),
+        vol.Optional(CONF_INPUTS, default={}): {cv.string: cv.SCRIPT_SCHEMA},
         vol.Optional(ATTR_FRIENDLY_NAME): cv.string,
         vol.Optional(ATTR_ENTITY_ID): cv.entity_ids,
     }
@@ -101,6 +102,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
         icon_template = device_config.get(CONF_ICON_TEMPLATE)
         entity_picture_template = device_config.get(CONF_ENTITY_PICTURE_TEMPLATE)
         availability_template = device_config.get(CONF_AVAILABILITY_TEMPLATE)
+        current_source_template = device_config.get(CURRENT_SOURCE_TEMPLATE)
         on_action = device_config[ON_ACTION]
         off_action = device_config[OFF_ACTION]
         play_action = device_config.get(PLAY_ACTION)
@@ -110,18 +112,19 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
         volume_up_action = device_config.get(VOLUME_UP_ACTION)
         volume_down_action = device_config.get(VOLUME_DOWN_ACTION)
         mute_action = device_config.get(MUTE_ACTION)
-        input_templates = device_config[CONF_INPUT_TEMPLATES]
+        input_templates = device_config[CONF_INPUTS]
 
         templates = {
             CONF_VALUE_TEMPLATE: state_template,
             CONF_ICON_TEMPLATE: icon_template,
             CONF_ENTITY_PICTURE_TEMPLATE: entity_picture_template,
             CONF_AVAILABILITY_TEMPLATE: availability_template,
+            CURRENT_SOURCE_TEMPLATE: current_source_template,
         }
 
-        initialise_templates(hass, templates, input_templates)
+        initialise_templates(hass, templates)
         entity_ids = extract_entities(
-            device, "media_player", device_config.get(ATTR_ENTITY_ID), templates, input_templates
+            device, "media_player", device_config.get(ATTR_ENTITY_ID), templates
         )
 
         media_players.append(
@@ -133,6 +136,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
                 icon_template,
                 entity_picture_template,
                 availability_template,
+                current_source_template,
                 on_action,
                 off_action,
                 play_action,
@@ -162,6 +166,7 @@ class MediaPlayerTemplate(MediaPlayerEntity):
         icon_template,
         entity_picture_template,
         availability_template,
+        current_source_template,
         on_action,
         off_action,
         play_action,
@@ -219,11 +224,11 @@ class MediaPlayerTemplate(MediaPlayerEntity):
         self._entities = entity_ids
         self._available = True
         self._input_templates = input_templates
+        self._current_source_template = current_source_template
         self._current_source = None
         self._source_list = list(input_templates.keys())
-        self._reverse_mapping = {value: key for key, value in input_templates.items()}
+        # self._reverse_mapping = {value: key for key, value in input_templates.items()}
         self._attributes = {}
-
 
     async def async_added_to_hass(self):
         """Register callbacks."""
@@ -247,7 +252,6 @@ class MediaPlayerTemplate(MediaPlayerEntity):
         self.hass.bus.async_listen_once(
             EVENT_HOMEASSISTANT_START, template_media_player_startup
         )
-
 
     @property
     def name(self):
@@ -291,6 +295,8 @@ class MediaPlayerTemplate(MediaPlayerEntity):
             support |= SUPPORT_VOLUME_STEP
         if self._mute_script is not None:
             support |= SUPPORT_VOLUME_MUTE
+        if self._source_list is not None:
+            support |= SUPPORT_SELECT_SOURCE
         return support
 
     @property
@@ -348,15 +354,29 @@ class MediaPlayerTemplate(MediaPlayerEntity):
         return STATE_OFF
 
     @property
+    def source(self):
+        """Return the current input source."""
+        try:
+            if self._current_source_template is not None:
+                self._current_source = self._current_source_template.async_render()
+            return self._current_source
+        except TemplateError as ex:
+            _LOGGER.error(ex)
+            return None
+
+    @property
     def source_list(self):
         """List of available input sources."""
         return self._source_list
 
-    def select_source(self, source):
+    async def select_source(self, source):
         """Set the input source."""
-        if source in self._source_list:
-            source = self._reverse_mapping[source]
-        
+        if source in self._input_templates:
+            source_script = Script(self.hass, self._input_templates[source])
+            if self._current_source_template is None:
+                self._current_source = source
+                self.async_write_ha_state()
+            await source_script.async_run(context=self._context)
 
     async def async_update(self):
         """Update the state from the template."""
@@ -370,7 +390,7 @@ class MediaPlayerTemplate(MediaPlayerEntity):
                 self._state = None
             else:
                 _LOGGER.error(
-                    "Received invalid vacuum state: %s. Expected: %s.",
+                    "Received invalid media_player state: %s. Expected: %s.",
                     state,
                     ", ".join(_VALID_STATES),
                 )
