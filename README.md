@@ -19,7 +19,7 @@ Preview config:
 
 ```yaml
 media_player:
-  - platform: template
+  - platform: media_player_template
     media_players:
       receiver:
         friendly_name: Receiver

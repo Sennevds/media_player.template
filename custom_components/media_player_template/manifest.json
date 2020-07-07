@@ -1,0 +1,8 @@
+{
+    "domain": "media_player",
+    "name": "Media player template",
+    "documentation": "https://github.com/Sennevds/media_player.template",
+    "requirements": [],
+    "dependencies": [],
+    "codeowners": ["@Sennevds"]
+  }
