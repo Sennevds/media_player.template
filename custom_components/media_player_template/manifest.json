@@ -1,5 +1,5 @@
 {
-    "domain": "media_player",
+    "domain": "media_player_template",
     "name": "Media player template",
     "documentation": "https://github.com/Sennevds/media_player.template",
     "requirements": [],
