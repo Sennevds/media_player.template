@@ -46,7 +46,7 @@ media_player:
           service: switch.turn_on
           data_template:
             entity_id: switch.vol
-        input_templates:
+        inputs:
           source 1:
             service: input_boolean.turn_on
             data_template:
