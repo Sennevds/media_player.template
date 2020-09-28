@@ -186,35 +186,40 @@ class MediaPlayerTemplate(MediaPlayerEntity):
         )
         self._name = friendly_name
         self._template = state_template
-        self._on_script = Script(hass, on_action)
-        self._off_script = Script(hass, off_action)
+        domain = __name__.split(".")[-2]
+        self._on_script = Script(hass, on_action, friendly_name, domain)
+        self._off_script = Script(hass, off_action, friendly_name, domain)
         self._play_script = None
         if play_action is not None:
-            self._play_script = Script(hass, play_action)
+            self._play_script = Script(hass, play_action, friendly_name, domain)
 
         self._pause_script = None
         if pause_action is not None:
-            self._pause_script = Script(hass, pause_action)
+            self._pause_script = Script(hass, pause_action, friendly_name, domain)
 
         self._next_script = None
         if next_action is not None:
-            self._next_script = Script(hass, next_action)
+            self._next_script = Script(hass, next_action, friendly_name, domain)
 
         self._previous_script = None
         if previous_action is not None:
-            self._previous_script = Script(hass, previous_action)
+            self._previous_script = Script(hass, previous_action, friendly_name, domain)
 
         self._volume_up_script = None
         if volume_up_action is not None:
-            self._volume_up_script = Script(hass, volume_up_action)
+            self._volume_up_script = Script(
+                hass, volume_up_action, friendly_name, domain
+            )
 
         self._volume_down_script = None
         if volume_down_action is not None:
-            self._volume_down_script = Script(hass, volume_down_action)
+            self._volume_down_script = Script(
+                hass, volume_down_action, friendly_name, domain
+            )
 
         self._mute_script = None
         if mute_action is not None:
-            self._mute_script = Script(hass, mute_action)
+            self._mute_script = Script(hass, mute_action, friendly_name, domain)
         self._state = False
         self._icon_template = icon_template
         self._entity_picture_template = entity_picture_template
