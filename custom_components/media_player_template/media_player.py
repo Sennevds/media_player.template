@@ -186,7 +186,7 @@ class MediaPlayerTemplate(MediaPlayerEntity):
         )
         self._name = friendly_name
         self._template = state_template
-        domain = __name__.split(".")[-2]
+        self._domain = __name__.split(".")[-2]
         self._on_script = Script(hass, on_action, friendly_name, domain)
         self._off_script = Script(hass, off_action, friendly_name, domain)
         self._play_script = None
@@ -377,7 +377,7 @@ class MediaPlayerTemplate(MediaPlayerEntity):
     async def select_source(self, source):
         """Set the input source."""
         if source in self._input_templates:
-            source_script = Script(self.hass, self._input_templates[source])
+            source_script = Script(self.hass, self._input_templates[source], self._name, self._domain)
             if self._current_source_template is None:
                 self._current_source = source
                 self.async_write_ha_state()
