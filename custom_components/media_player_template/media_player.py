@@ -187,39 +187,41 @@ class MediaPlayerTemplate(MediaPlayerEntity):
         self._name = friendly_name
         self._template = state_template
         self._domain = __name__.split(".")[-2]
-        self._on_script = Script(hass, on_action, friendly_name, domain)
-        self._off_script = Script(hass, off_action, friendly_name, domain)
+        self._on_script = Script(hass, on_action, friendly_name, self._domain)
+        self._off_script = Script(hass, off_action, friendly_name, self._domain)
         self._play_script = None
         if play_action is not None:
-            self._play_script = Script(hass, play_action, friendly_name, domain)
+            self._play_script = Script(hass, play_action, friendly_name, self._domain)
 
         self._pause_script = None
         if pause_action is not None:
-            self._pause_script = Script(hass, pause_action, friendly_name, domain)
+            self._pause_script = Script(hass, pause_action, friendly_name, self._domain)
 
         self._next_script = None
         if next_action is not None:
-            self._next_script = Script(hass, next_action, friendly_name, domain)
+            self._next_script = Script(hass, next_action, friendly_name, self._domain)
 
         self._previous_script = None
         if previous_action is not None:
-            self._previous_script = Script(hass, previous_action, friendly_name, domain)
+            self._previous_script = Script(
+                hass, previous_action, friendly_name, self._domain
+            )
 
         self._volume_up_script = None
         if volume_up_action is not None:
             self._volume_up_script = Script(
-                hass, volume_up_action, friendly_name, domain
+                hass, volume_up_action, friendly_name, self._domain
             )
 
         self._volume_down_script = None
         if volume_down_action is not None:
             self._volume_down_script = Script(
-                hass, volume_down_action, friendly_name, domain
+                hass, volume_down_action, friendly_name, self._domain
             )
 
         self._mute_script = None
         if mute_action is not None:
-            self._mute_script = Script(hass, mute_action, friendly_name, domain)
+            self._mute_script = Script(hass, mute_action, friendly_name, self._domain)
         self._state = False
         self._icon_template = icon_template
         self._entity_picture_template = entity_picture_template
@@ -377,7 +379,9 @@ class MediaPlayerTemplate(MediaPlayerEntity):
     async def select_source(self, source):
         """Set the input source."""
         if source in self._input_templates:
-            source_script = Script(self.hass, self._input_templates[source], self._name, self._domain)
+            source_script = Script(
+                self.hass, self._input_templates[source], self._name, self._domain
+            )
             if self._current_source_template is None:
                 self._current_source = source
                 self.async_write_ha_state()
