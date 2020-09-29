@@ -7,6 +7,7 @@ from homeassistant.components.media_player import (
     ENTITY_ID_FORMAT,
     PLATFORM_SCHEMA,
     MediaPlayerEntity,
+    ATTR_MEDIA_VOLUME_LEVEL,
 )
 from homeassistant.components.media_player.const import (
     SUPPORT_NEXT_TRACK,
@@ -19,6 +20,8 @@ from homeassistant.components.media_player.const import (
     SUPPORT_VOLUME_MUTE,
     SUPPORT_VOLUME_STEP,
     SUPPORT_SELECT_SOURCE,
+    SUPPORT_VOLUME_SET,
+    SUPPORT_PLAY_MEDIA,
 )
 from homeassistant.const import (
     ATTR_ENTITY_ID,
@@ -62,6 +65,13 @@ VOLUME_DOWN_ACTION = "volume_down"
 MUTE_ACTION = "mute"
 CURRENT_SOURCE_TEMPLATE = "current_source_template"
 CONF_INPUTS = "inputs"
+TITLE_TEMPLATE = "title_template"
+ARTIST_TEMPLATE = "artist_template"
+ALBUM_TEMPLATE = "album_template"
+CURRENT_VOLUME_TEMPLATE = "current_volume_template"
+ALBUM_ART_TEMPLATE = "album_art_template"
+SET_VOLUME_ACTION = "set_volume"
+PLAY_MEDIA_ACTION = "play_media"
 
 
 MEDIA_PLAYER_SCHEMA = vol.Schema(
@@ -83,6 +93,13 @@ MEDIA_PLAYER_SCHEMA = vol.Schema(
         vol.Optional(CONF_INPUTS, default={}): {cv.string: cv.SCRIPT_SCHEMA},
         vol.Optional(ATTR_FRIENDLY_NAME): cv.string,
         vol.Optional(ATTR_ENTITY_ID): cv.entity_ids,
+        vol.Optional(SET_VOLUME_ACTION): cv.SCRIPT_SCHEMA,
+        vol.Optional(PLAY_MEDIA_ACTION): cv.SCRIPT_SCHEMA,
+        vol.Optional(TITLE_TEMPLATE): cv.template,
+        vol.Optional(ARTIST_TEMPLATE): cv.template,
+        vol.Optional(ALBUM_TEMPLATE): cv.template,
+        vol.Optional(CURRENT_VOLUME_TEMPLATE): cv.template,
+        vol.Optional(ALBUM_ART_TEMPLATE): cv.template,
     }
 )
 SUPPORT_TEMPLATE = SUPPORT_TURN_OFF | SUPPORT_TURN_ON
@@ -113,6 +130,13 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
         volume_down_action = device_config.get(VOLUME_DOWN_ACTION)
         mute_action = device_config.get(MUTE_ACTION)
         input_templates = device_config[CONF_INPUTS]
+        title_template = device_config.get(TITLE_TEMPLATE)
+        artist_template = device_config.get(ARTIST_TEMPLATE)
+        album_template = device_config.get(ALBUM_TEMPLATE)
+        current_volume_template = device_config.get(CURRENT_VOLUME_TEMPLATE)
+        album_art_template = device_config.get(ALBUM_ART_TEMPLATE)
+        set_volume_action = device_config.get(SET_VOLUME_ACTION)
+        play_media_action = device_config.get(PLAY_MEDIA_ACTION)
 
         templates = {
             CONF_VALUE_TEMPLATE: state_template,
@@ -120,6 +144,11 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
             CONF_ENTITY_PICTURE_TEMPLATE: entity_picture_template,
             CONF_AVAILABILITY_TEMPLATE: availability_template,
             CURRENT_SOURCE_TEMPLATE: current_source_template,
+            TITLE_TEMPLATE: title_template,
+            ARTIST_TEMPLATE: artist_template,
+            ALBUM_TEMPLATE: album_template,
+            CURRENT_VOLUME_TEMPLATE: current_volume_template,
+            ALBUM_ART_TEMPLATE: album_art_template,
         }
 
         initialise_templates(hass, templates)
@@ -148,6 +177,13 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
                 mute_action,
                 entity_ids,
                 input_templates,
+                title_template,
+                artist_template,
+                album_template,
+                current_volume_template,
+                album_art_template,
+                set_volume_action,
+                play_media_action,
             )
         )
 
@@ -178,6 +214,13 @@ class MediaPlayerTemplate(MediaPlayerEntity):
         mute_action,
         entity_ids,
         input_templates,
+        title_template,
+        artist_template,
+        album_template,
+        current_volume_template,
+        album_art_template,
+        set_volume_action,
+        play_media_action,
     ):
         """Initialize the Template switch."""
         self.hass = hass
@@ -222,6 +265,18 @@ class MediaPlayerTemplate(MediaPlayerEntity):
         self._mute_script = None
         if mute_action is not None:
             self._mute_script = Script(hass, mute_action, friendly_name, self._domain)
+
+        self._set_volume_script = None
+        if set_volume_action is not None:
+            self._set_volume_script = Script(
+                hass, set_volume_action, friendly_name, self._domain
+            )
+        self._play_media_script = None
+        if play_media_action is not None:
+            self._play_media_script = Script(
+                hass, play_media_action, friendly_name, self._domain
+            )
+
         self._state = False
         self._icon_template = icon_template
         self._entity_picture_template = entity_picture_template
@@ -234,8 +289,17 @@ class MediaPlayerTemplate(MediaPlayerEntity):
         self._current_source_template = current_source_template
         self._current_source = None
         self._source_list = list(input_templates.keys())
-        # self._reverse_mapping = {value: key for key, value in input_templates.items()}
         self._attributes = {}
+        self._title_template = title_template
+        self._artist_template = artist_template
+        self._album_template = album_template
+        self._current_volume_template = current_volume_template
+        self._album_art_template = album_art_template
+        self._track_name = None
+        self._track_artist = None
+        self._track_album_name = None
+        self._album_art = None
+        self._volume = None
 
     async def async_added_to_hass(self):
         """Register callbacks."""
@@ -304,6 +368,10 @@ class MediaPlayerTemplate(MediaPlayerEntity):
             support |= SUPPORT_VOLUME_MUTE
         if self._source_list is not None:
             support |= SUPPORT_SELECT_SOURCE
+        if self._set_volume_script is not None:
+            support |= SUPPORT_VOLUME_SET
+        if self._play_media_script is not None:
+            support |= SUPPORT_PLAY_MEDIA
         return support
 
     @property
@@ -340,12 +408,27 @@ class MediaPlayerTemplate(MediaPlayerEntity):
         await self._pause_script.async_run(context=self._context)
 
     async def async_media_next_track(self):
-        """Fire the off action."""
+        """Fire the media next action."""
         await self._next_script.async_run(context=self._context)
 
     async def async_media_previous_track(self):
-        """Fire the off action."""
+        """Fire the media previous action."""
         await self._previous_script.async_run(context=self._context)
+
+    async def async_set_volume_level(self, volume):
+        """Set the volume."""
+        if self._current_volume_template is None:
+            self._volume = volume
+            self.async_write_ha_state()
+        await self._set_volume_script.async_run(
+            {"volume": volume}, context=self._context
+        )
+
+    async def async_play_media(self, media_type, media_id, **kwargs):
+        """Play radio station by preset number."""
+        await self._play_media_script.async_run(
+            {"media_type": media_type, "media_id": media_id}, context=self._context
+        )
 
     @property
     def state(self):
@@ -376,7 +459,40 @@ class MediaPlayerTemplate(MediaPlayerEntity):
         """List of available input sources."""
         return self._source_list
 
-    async def select_source(self, source):
+    @property
+    def volume_level(self):
+        """Volume level of the media player (0..1)."""
+        return self._volume
+
+    @property
+    def media_title(self):
+        """Title of current playing media."""
+        return self._track_name
+
+    @property
+    def media_artist(self):
+        """Artist of current playing media, music track only."""
+        return self._track_artist
+
+    @property
+    def media_album_name(self):
+        """Album name of current playing media, music track only."""
+        return self._track_album_name
+
+    @property
+    def media_image_hash(self):
+        """Hash value for media image."""
+        if self._album_art:
+            return bytes(self._album_art)
+        return None
+
+    async def async_get_media_image(self):
+        """Fetch media image of current playing image."""
+        if self._album_art:
+            return (self._album_art, "image/jpeg")
+        return None, None
+
+    async def async_select_source(self, source):
         """Set the input source."""
         if source in self._input_templates:
             source_script = Script(
@@ -413,6 +529,11 @@ class MediaPlayerTemplate(MediaPlayerEntity):
             ("_icon", self._icon_template),
             ("_entity_picture", self._entity_picture_template),
             ("_available", self._availability_template),
+            ("_volume", self._current_volume_template),
+            ("_track_name", self._title_template),
+            ("_track_artist", self._artist_template),
+            ("_track_album_name", self._album_template),
+            ("_album_art", self._album_art_template),
         ):
             if template is None:
                 continue
