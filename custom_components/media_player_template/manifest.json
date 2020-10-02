@@ -2,6 +2,7 @@
     "domain": "media_player_template",
     "name": "Media player template",
     "documentation": "https://github.com/Sennevds/media_player.template",
+    "issue_tracker": "https://github.com/Sennevds/media_player.template/issues"
     "requirements": [],
     "dependencies": [],
     "codeowners": ["@Sennevds"]
