@@ -7,7 +7,6 @@ from homeassistant.components.media_player import (
     ENTITY_ID_FORMAT,
     PLATFORM_SCHEMA,
     MediaPlayerEntity,
-    ATTR_MEDIA_VOLUME_LEVEL,
 )
 from homeassistant.components.media_player.const import (
     SUPPORT_NEXT_TRACK,
@@ -29,13 +28,9 @@ from homeassistant.const import (
     CONF_ENTITY_PICTURE_TEMPLATE,
     CONF_ICON_TEMPLATE,
     CONF_VALUE_TEMPLATE,
-    EVENT_HOMEASSISTANT_START,
-    EVENT_HOMEASSISTANT_STOP,
-    MATCH_ALL,
     STATE_ON,
     STATE_OFF,
     STATE_IDLE,
-    STATE_OFF,
     STATE_PAUSED,
     STATE_PLAYING,
     STATE_UNKNOWN,
@@ -44,7 +39,6 @@ from homeassistant.core import callback
 from homeassistant.exceptions import TemplateError
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.entity import async_generate_entity_id
-from homeassistant.helpers.event import async_track_state_change
 from homeassistant.helpers.script import Script
 from homeassistant.components.template.template_entity import TemplateEntity
 from homeassistant.components.template.const import (
@@ -72,6 +66,7 @@ CONF_MEDIAPLAYER = "media_players"
 ON_ACTION = "turn_on"
 OFF_ACTION = "turn_off"
 PLAY_ACTION = "play"
+STOP_ACTION = "stop"
 PAUSE_ACTION = "pause"
 NEXT_ACTION = "next"
 PREVIOUS_ACTION = "previous"
@@ -87,6 +82,12 @@ CURRENT_VOLUME_TEMPLATE = "current_volume_template"
 ALBUM_ART_TEMPLATE = "album_art_template"
 SET_VOLUME_ACTION = "set_volume"
 PLAY_MEDIA_ACTION = "play_media"
+MEDIA_CONTENT_TYPE_TEMPLATE = "media_content_type_template"
+MEDIA_IMAGE_URL_TEMPLATE = "media_image_url_template"
+MEDIA_EPISODE_TEMPLATE = "media_episode_template"
+MEDIA_SEASON_TEMPLATE = "media_season_template"
+MEDIA_SERIES_TITLE_TEMPLATE = "media_series_title_template"
+MEDIA_ALBUM_ARTIST_TEMPLATE = "media_album_artist_template"
 
 
 MEDIA_PLAYER_SCHEMA = vol.Schema(
@@ -99,6 +100,7 @@ MEDIA_PLAYER_SCHEMA = vol.Schema(
         vol.Required(ON_ACTION): cv.SCRIPT_SCHEMA,
         vol.Required(OFF_ACTION): cv.SCRIPT_SCHEMA,
         vol.Optional(PLAY_ACTION): cv.SCRIPT_SCHEMA,
+        vol.Optional(STOP_ACTION): cv.SCRIPT_SCHEMA,
         vol.Optional(PAUSE_ACTION): cv.SCRIPT_SCHEMA,
         vol.Optional(NEXT_ACTION): cv.SCRIPT_SCHEMA,
         vol.Optional(PREVIOUS_ACTION): cv.SCRIPT_SCHEMA,
@@ -115,6 +117,12 @@ MEDIA_PLAYER_SCHEMA = vol.Schema(
         vol.Optional(ALBUM_TEMPLATE): cv.template,
         vol.Optional(CURRENT_VOLUME_TEMPLATE): cv.template,
         vol.Optional(ALBUM_ART_TEMPLATE): cv.template,
+        vol.Optional(MEDIA_CONTENT_TYPE_TEMPLATE): cv.template,
+        vol.Optional(MEDIA_IMAGE_URL_TEMPLATE): cv.template,
+        vol.Optional(MEDIA_EPISODE_TEMPLATE): cv.template,
+        vol.Optional(MEDIA_SEASON_TEMPLATE): cv.template,
+        vol.Optional(MEDIA_SERIES_TITLE_TEMPLATE): cv.template,
+        vol.Optional(MEDIA_ALBUM_ARTIST_TEMPLATE): cv.template,
     }
 )
 SUPPORT_TEMPLATE = SUPPORT_TURN_OFF | SUPPORT_TURN_ON
@@ -145,6 +153,7 @@ async def _async_create_entities(hass, config):
         on_action = device_config[ON_ACTION]
         off_action = device_config[OFF_ACTION]
         play_action = device_config.get(PLAY_ACTION)
+        stop_action = device_config.get(STOP_ACTION)
         pause_action = device_config.get(PAUSE_ACTION)
         next_action = device_config.get(NEXT_ACTION)
         previous_action = device_config.get(PREVIOUS_ACTION)
@@ -159,24 +168,12 @@ async def _async_create_entities(hass, config):
         album_art_template = device_config.get(ALBUM_ART_TEMPLATE)
         set_volume_action = device_config.get(SET_VOLUME_ACTION)
         play_media_action = device_config.get(PLAY_MEDIA_ACTION)
-
-        # templates = {
-        #     CONF_VALUE_TEMPLATE: state_template,
-        #     CONF_ICON_TEMPLATE: icon_template,
-        #     CONF_ENTITY_PICTURE_TEMPLATE: entity_picture_template,
-        #     CONF_AVAILABILITY_TEMPLATE: availability_template,
-        #     CURRENT_SOURCE_TEMPLATE: current_source_template,
-        #     TITLE_TEMPLATE: title_template,
-        #     ARTIST_TEMPLATE: artist_template,
-        #     ALBUM_TEMPLATE: album_template,
-        #     CURRENT_VOLUME_TEMPLATE: current_volume_template,
-        #     ALBUM_ART_TEMPLATE: album_art_template,
-        # }
-
-        # initialise_templates(hass, templates)
-        # entity_ids = extract_entities(
-        #     device, "media_player", device_config.get(ATTR_ENTITY_ID), templates
-        # )
+        media_content_type_template = device_config.get(MEDIA_CONTENT_TYPE_TEMPLATE)
+        media_image_url_template = device_config.get(MEDIA_IMAGE_URL_TEMPLATE)
+        media_episode_template = device_config.get(MEDIA_EPISODE_TEMPLATE)
+        media_season_template = device_config.get(MEDIA_SEASON_TEMPLATE)
+        media_series_title_template = device_config.get(MEDIA_SERIES_TITLE_TEMPLATE)
+        media_album_artist_template = device_config.get(MEDIA_ALBUM_ARTIST_TEMPLATE)
 
         media_players.append(
             MediaPlayerTemplate(
@@ -191,6 +188,7 @@ async def _async_create_entities(hass, config):
                 on_action,
                 off_action,
                 play_action,
+                stop_action,
                 pause_action,
                 next_action,
                 previous_action,
@@ -205,6 +203,12 @@ async def _async_create_entities(hass, config):
                 album_art_template,
                 set_volume_action,
                 play_media_action,
+                media_content_type_template,
+                media_image_url_template,
+                media_episode_template,
+                media_season_template,
+                media_series_title_template,
+                media_album_artist_template,
             )
         )
         return media_players
@@ -226,6 +230,7 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         on_action,
         off_action,
         play_action,
+        stop_action,
         pause_action,
         next_action,
         previous_action,
@@ -240,6 +245,12 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         album_art_template,
         set_volume_action,
         play_media_action,
+        media_content_type_template,
+        media_image_url_template,
+        media_episode_template,
+        media_season_template,
+        media_series_title_template,
+        media_album_artist_template,
     ):
         """Initialize the Template Media player."""
         super().__init__(
@@ -259,6 +270,10 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         self._play_script = None
         if play_action is not None:
             self._play_script = Script(hass, play_action, friendly_name, self._domain)
+
+        self._stop_script = None
+        if stop_action is not None:
+            self._stop_script = Script(hass, stop_action, friendly_name, self._domain)
 
         self._pause_script = None
         if pause_action is not None:
@@ -315,11 +330,25 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         self._album_template = album_template
         self._current_volume_template = current_volume_template
         self._album_art_template = album_art_template
+        self._media_content_type_template = media_content_type_template
+        self._media_image_url_template = media_image_url_template
+        self._media_episode_template = media_episode_template
+        self._media_season_template = media_season_template
+        self._media_series_title_template = media_series_title_template
+        self._media_album_artist_template = media_album_artist_template
+        self._media_content_type_template = media_content_type_template
+
         self._track_name = None
         self._track_artist = None
         self._track_album_name = None
         self._album_art = None
         self._volume = None
+        self._media_image_url = None
+        self._media_episode = None
+        self._media_season = None
+        self._media_series_title = None
+        self._media_album_artist = None
+        self._media_content_type = None
 
     async def async_added_to_hass(self):
         """Register callbacks."""
@@ -344,32 +373,32 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
 
         if self._album_art_template is not None:
             self.add_template_attribute("_album_art", self._album_art_template)
-
+        if self._media_content_type_template is not None:
+            self.add_template_attribute(
+                "_media_content_type", self._media_content_type_template
+            )
+        if self._media_image_url_template is not None:
+            self.add_template_attribute(
+                "_media_image_url", self._media_image_url_template
+            )
+        if self._media_episode_template is not None:
+            self.add_template_attribute("_media_episode", self._media_episode_template)
+        if self._media_season_template is not None:
+            self.add_template_attribute("_media_season", self._media_season_template)
+        if self._media_series_title_template is not None:
+            self.add_template_attribute(
+                "_media_series", self._media_series_title_template
+            )
+        if self._media_album_artist_template is not None:
+            self.add_template_attribute(
+                "_media_album_artist", self._media_album_artist_template
+            )
         await super().async_added_to_hass()
 
     @callback
     def _update_state(self, result):
         super()._update_state(result)
         self._state = None if isinstance(result, TemplateError) else result
-        # @callback
-        # def template_media_player_state_listener(entity, old_state, new_state):
-        #     """Handle device state changes."""
-        #     self.async_schedule_update_ha_state(True)
-
-        # @callback
-        # def template_media_player_startup(event):
-        #     """Update template on startup."""
-        #     if self._entities != MATCH_ALL:
-        #         # Track state change only for valid templates
-        #         async_track_state_change(
-        #             self.hass, self._entities, template_media_player_state_listener
-        #         )
-
-        #     self.async_schedule_update_ha_state(True)
-
-        # self.hass.bus.async_listen_once(
-        #     EVENT_HOMEASSISTANT_START, template_media_player_startup
-        # )
 
     @property
     def name(self):
@@ -403,6 +432,8 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         support = SUPPORT_TEMPLATE
         if self._play_script is not None:
             support |= SUPPORT_PLAY
+        if self._stop_script is not None:
+            support |= SUPPORT_STOP
         if self._pause_script is not None:
             support |= SUPPORT_PAUSE
         if self._next_script is not None:
@@ -449,6 +480,9 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
     async def async_media_play(self):
         """Fire the off action."""
         await self._play_script.async_run(context=self._context)
+
+    async def async_media_stop(self):
+        await self._stop_script.async_run(context=self._context)
 
     async def async_media_pause(self):
         """Fire the off action."""
@@ -526,22 +560,44 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         return self._track_artist
 
     @property
+    def media_content_type(self):
+        """Content type of current playing media."""
+        # if self._state == STATE_PLAYING or self._state == STATE_PAUSED:
+        #     return MEDIA_TYPE_MUSIC
+        return self._media_content_type
+
+    @property
     def media_album_name(self):
         """Album name of current playing media, music track only."""
         return self._track_album_name
 
     @property
-    def media_image_hash(self):
-        """Hash value for media image."""
-        if self._album_art:
-            return bytes(self._album_art)
-        return None
+    def media_album_artist(self):
+        return self._media_album_artist
 
-    async def async_get_media_image(self):
-        """Fetch media image of current playing image."""
-        if self._album_art:
-            return (self._album_art, "image/jpeg")
-        return None, None
+    @property
+    def media_series_title(self):
+        """Return the title of the series of current playing media."""
+        return self._media_series_title
+
+    @property
+    def media_season(self):
+        """Season of current playing media (TV Show only)."""
+        return self._media_season
+
+    @property
+    def media_episode(self):
+        """Episode of current playing media (TV Show only)."""
+        return self._media_episode
+
+    @property
+    def media_image_url(self):
+        return self._media_image_url
+
+    @property
+    def media_image_remotely_accessible(self) -> bool:
+        """If the image url is remotely accessible."""
+        return True
 
     async def async_select_source(self, source):
         """Set the input source."""
