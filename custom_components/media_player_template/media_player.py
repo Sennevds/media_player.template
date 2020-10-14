@@ -46,12 +46,27 @@ import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.event import async_track_state_change
 from homeassistant.helpers.script import Script
+from homeassistant.components.template.template_entity import TemplateEntity
+from homeassistant.components.template.const import (
+    CONF_AVAILABILITY_TEMPLATE,
+    DOMAIN,
+    PLATFORMS,
+)
+from homeassistant.helpers.reload import async_setup_reload_service
 
-from . import extract_entities, initialise_templates
+# from . import extract_entities, initialise_templates
 
 
 _LOGGER = logging.getLogger(__name__)
-_VALID_STATES = [STATE_ON, STATE_OFF, "true", "false", STATE_IDLE]
+_VALID_STATES = [
+    STATE_ON,
+    STATE_OFF,
+    "true",
+    "false",
+    STATE_IDLE,
+    STATE_PAUSED,
+    STATE_PLAYING,
+]
 CONF_AVAILABILITY_TEMPLATE = "availability_template"
 CONF_MEDIAPLAYER = "media_players"
 ON_ACTION = "turn_on"
@@ -110,6 +125,13 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
 
 
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
+    """Set up the template binary sensors."""
+
+    await async_setup_reload_service(hass, DOMAIN, PLATFORMS)
+    async_add_entities(await _async_create_entities(hass, config))
+
+
+async def _async_create_entities(hass, config):
     """Set up the Template switch."""
     media_players = []
 
@@ -138,23 +160,23 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
         set_volume_action = device_config.get(SET_VOLUME_ACTION)
         play_media_action = device_config.get(PLAY_MEDIA_ACTION)
 
-        templates = {
-            CONF_VALUE_TEMPLATE: state_template,
-            CONF_ICON_TEMPLATE: icon_template,
-            CONF_ENTITY_PICTURE_TEMPLATE: entity_picture_template,
-            CONF_AVAILABILITY_TEMPLATE: availability_template,
-            CURRENT_SOURCE_TEMPLATE: current_source_template,
-            TITLE_TEMPLATE: title_template,
-            ARTIST_TEMPLATE: artist_template,
-            ALBUM_TEMPLATE: album_template,
-            CURRENT_VOLUME_TEMPLATE: current_volume_template,
-            ALBUM_ART_TEMPLATE: album_art_template,
-        }
+        # templates = {
+        #     CONF_VALUE_TEMPLATE: state_template,
+        #     CONF_ICON_TEMPLATE: icon_template,
+        #     CONF_ENTITY_PICTURE_TEMPLATE: entity_picture_template,
+        #     CONF_AVAILABILITY_TEMPLATE: availability_template,
+        #     CURRENT_SOURCE_TEMPLATE: current_source_template,
+        #     TITLE_TEMPLATE: title_template,
+        #     ARTIST_TEMPLATE: artist_template,
+        #     ALBUM_TEMPLATE: album_template,
+        #     CURRENT_VOLUME_TEMPLATE: current_volume_template,
+        #     ALBUM_ART_TEMPLATE: album_art_template,
+        # }
 
-        initialise_templates(hass, templates)
-        entity_ids = extract_entities(
-            device, "media_player", device_config.get(ATTR_ENTITY_ID), templates
-        )
+        # initialise_templates(hass, templates)
+        # entity_ids = extract_entities(
+        #     device, "media_player", device_config.get(ATTR_ENTITY_ID), templates
+        # )
 
         media_players.append(
             MediaPlayerTemplate(
@@ -175,7 +197,6 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
                 volume_up_action,
                 volume_down_action,
                 mute_action,
-                entity_ids,
                 input_templates,
                 title_template,
                 artist_template,
@@ -186,12 +207,11 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
                 play_media_action,
             )
         )
+        return media_players
 
-    async_add_entities(media_players)
 
-
-class MediaPlayerTemplate(MediaPlayerEntity):
-    """Representation of a Template switch."""
+class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
+    """Representation of a Template Media player."""
 
     def __init__(
         self,
@@ -212,7 +232,6 @@ class MediaPlayerTemplate(MediaPlayerEntity):
         volume_up_action,
         volume_down_action,
         mute_action,
-        entity_ids,
         input_templates,
         title_template,
         artist_template,
@@ -222,7 +241,12 @@ class MediaPlayerTemplate(MediaPlayerEntity):
         set_volume_action,
         play_media_action,
     ):
-        """Initialize the Template switch."""
+        """Initialize the Template Media player."""
+        super().__init__(
+            availability_template=availability_template,
+            icon_template=icon_template,
+            entity_picture_template=entity_picture_template,
+        )
         self.hass = hass
         self.entity_id = async_generate_entity_id(
             ENTITY_ID_FORMAT, device_id, hass=hass
@@ -278,12 +302,8 @@ class MediaPlayerTemplate(MediaPlayerEntity):
             )
 
         self._state = False
-        self._icon_template = icon_template
-        self._entity_picture_template = entity_picture_template
-        self._availability_template = availability_template
         self._icon = None
         self._entity_picture = None
-        self._entities = entity_ids
         self._available = True
         self._input_templates = input_templates
         self._current_source_template = current_source_template
@@ -303,26 +323,53 @@ class MediaPlayerTemplate(MediaPlayerEntity):
 
     async def async_added_to_hass(self):
         """Register callbacks."""
+        self.add_template_attribute("_state", self._template, None, self._update_state)
 
-        @callback
-        def template_media_player_state_listener(entity, old_state, new_state):
-            """Handle device state changes."""
-            self.async_schedule_update_ha_state(True)
+        if self._current_source_template is not None:
+            self.add_template_attribute(
+                "_current_source", self._current_source_template
+            )
 
-        @callback
-        def template_media_player_startup(event):
-            """Update template on startup."""
-            if self._entities != MATCH_ALL:
-                # Track state change only for valid templates
-                async_track_state_change(
-                    self.hass, self._entities, template_media_player_state_listener
-                )
+        if self._title_template is not None:
+            self.add_template_attribute("_track_name", self._title_template)
 
-            self.async_schedule_update_ha_state(True)
+        if self._artist_template is not None:
+            self.add_template_attribute("_track_artist", self._artist_template)
 
-        self.hass.bus.async_listen_once(
-            EVENT_HOMEASSISTANT_START, template_media_player_startup
-        )
+        if self._album_template is not None:
+            self.add_template_attribute("_track_album_name", self._album_template)
+
+        if self._current_volume_template is not None:
+            self.add_template_attribute("_volume", self._current_volume_template)
+
+        if self._album_art_template is not None:
+            self.add_template_attribute("_album_art", self._album_art_template)
+
+        await super().async_added_to_hass()
+
+    @callback
+    def _update_state(self, result):
+        super()._update_state(result)
+        self._state = None if isinstance(result, TemplateError) else result
+        # @callback
+        # def template_media_player_state_listener(entity, old_state, new_state):
+        #     """Handle device state changes."""
+        #     self.async_schedule_update_ha_state(True)
+
+        # @callback
+        # def template_media_player_startup(event):
+        #     """Update template on startup."""
+        #     if self._entities != MATCH_ALL:
+        #         # Track state change only for valid templates
+        #         async_track_state_change(
+        #             self.hass, self._entities, template_media_player_state_listener
+        #         )
+
+        #     self.async_schedule_update_ha_state(True)
+
+        # self.hass.bus.async_listen_once(
+        #     EVENT_HOMEASSISTANT_START, template_media_player_startup
+        # )
 
     @property
     def name(self):
@@ -362,7 +409,7 @@ class MediaPlayerTemplate(MediaPlayerEntity):
             support |= SUPPORT_NEXT_TRACK
         if self._previous_script is not None:
             support |= SUPPORT_PREVIOUS_TRACK
-        if self._volume_up_script is not None:
+        if self._volume_up_script is not None or self._volume_down_script is not None:
             support |= SUPPORT_VOLUME_STEP
         if self._mute_script is not None:
             support |= SUPPORT_VOLUME_MUTE
@@ -425,7 +472,7 @@ class MediaPlayerTemplate(MediaPlayerEntity):
         )
 
     async def async_play_media(self, media_type, media_id, **kwargs):
-        """Play radio station by preset number."""
+        """play media"""
         await self._play_media_script.async_run(
             {"media_type": media_type, "media_id": media_id}, context=self._context
         )
@@ -435,6 +482,10 @@ class MediaPlayerTemplate(MediaPlayerEntity):
         """Return the state of the player."""
         if self._state is None:
             return None
+        elif self._state == "playing":
+            return STATE_PLAYING
+        elif self._state == "paused":
+            return STATE_PAUSED
         elif self._state == "idle":
             return STATE_IDLE
         elif self._state == "on":
