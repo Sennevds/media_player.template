@@ -20,6 +20,19 @@ Current implemented features:
 * current volume
 * set_volume action
 * play_media action (not tested)
+* media_content_type_template
+* media_image_url_template
+* media_episode_template
+* media_season_template
+* media_series_title_template
+* media_album_artist_template
+
+media_content_type_template can be one of the following values:
+* tv_show
+* music
+* movie
+* video
+based on this value other parameters are shown ex artist is only shown when type is music
 
 ## Variables used:
 set_volume:
