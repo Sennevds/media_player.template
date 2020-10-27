@@ -1,4 +1,6 @@
 # media_player.template
+[![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)](https://github.com/custom-components/hacs)
+
 media_player template for Home Assistant
 
 Current implemented features:
