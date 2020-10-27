@@ -1,0 +1,7 @@
+{
+  "name": "Media player template",
+  "domains": ["media_player"],
+  "homeassistant": "0.116",
+  "render_readme": true,
+  "iot_class": ["Local Polling", "Local Push"]
+}
