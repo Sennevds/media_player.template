@@ -1,7 +1,16 @@
 # media_player.template
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)](https://github.com/custom-components/hacs)
-
 media_player template for Home Assistant
+
+[![GitHub Release][releases-shield]][releases]
+[![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)](https://github.com/custom-components/hacs)
+[![License][license-shield]](LICENSE.md)
+
+![Project Maintenance][maintenance-shield]
+[![GitHub Activity][commits-shield]][commits]
+
+[![Community Forum][forum-shield]][forum]
+
+
 
 Current implemented features:
 * on_action
@@ -94,3 +103,12 @@ media_player:
         album_template: "{{ states('input_text.album') }}"
         artist_template: "{{ states('input_text.artist') }}"
 ```
+
+[commits-shield]: https://img.shields.io/github/commit-activity/m/Sennevds/media_player.template?style=for-the-badge
+[commits]: https://github.com/sennevds/media_player.template/commits/master
+[forum-shield]: https://img.shields.io/badge/community-forum-brightgreen.svg?style=for-the-badge
+[forum]: https://community.home-assistant.io/t/media-player-template/203062
+[license-shield]: https://img.shields.io/github/license/sennevds/media_player.template.svg?style=for-the-badge
+[maintenance-shield]: https://img.shields.io/maintenance/yes/2020.svg?style=for-the-badge
+[releases-shield]: https://img.shields.io/github/release/sennevds/media_player.template.svg?style=for-the-badge
+[releases]: https://github.com/sennevds/media_player.template/releases
