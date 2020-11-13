@@ -43,6 +43,7 @@ media_content_type_template can be one of the following values:
 * music
 * movie
 * video
+
 based on this value other parameters are shown ex artist is only shown when type is music
 
 ## Variables used:
