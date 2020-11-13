@@ -4,6 +4,6 @@
     "documentation": "https://github.com/Sennevds/media_player.template",
     "issue_tracker": "https://github.com/Sennevds/media_player.template/issues",
     "requirements": [],
-    "dependencies": ["template"],
+    "dependencies": [],
     "codeowners": ["@Sennevds"]
   }
