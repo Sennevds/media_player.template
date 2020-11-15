@@ -211,7 +211,7 @@ async def _async_create_entities(hass, config):
                 media_album_artist_template,
             )
         )
-        return media_players
+    return media_players
 
 
 class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
