@@ -1,8 +1,8 @@
 """Support for switches which integrates with other components."""
 import logging
 
+import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
-
 from homeassistant.components.media_player import (
     ENTITY_ID_FORMAT,
     PLATFORM_SCHEMA,
@@ -12,41 +12,40 @@ from homeassistant.components.media_player.const import (
     SUPPORT_NEXT_TRACK,
     SUPPORT_PAUSE,
     SUPPORT_PLAY,
+    SUPPORT_PLAY_MEDIA,
     SUPPORT_PREVIOUS_TRACK,
+    SUPPORT_SELECT_SOURCE,
     SUPPORT_STOP,
     SUPPORT_TURN_OFF,
     SUPPORT_TURN_ON,
     SUPPORT_VOLUME_MUTE,
-    SUPPORT_VOLUME_STEP,
-    SUPPORT_SELECT_SOURCE,
     SUPPORT_VOLUME_SET,
-    SUPPORT_PLAY_MEDIA,
+    SUPPORT_VOLUME_STEP,
 )
+from homeassistant.components.template.const import (
+    CONF_AVAILABILITY_TEMPLATE,
+    DOMAIN,
+    PLATFORMS,
+)
+from homeassistant.components.template.template_entity import TemplateEntity
 from homeassistant.const import (
     ATTR_ENTITY_ID,
     ATTR_FRIENDLY_NAME,
     CONF_ENTITY_PICTURE_TEMPLATE,
     CONF_ICON_TEMPLATE,
     CONF_VALUE_TEMPLATE,
-    STATE_ON,
-    STATE_OFF,
     STATE_IDLE,
+    STATE_OFF,
+    STATE_ON,
     STATE_PAUSED,
     STATE_PLAYING,
     STATE_UNKNOWN,
 )
 from homeassistant.core import callback
 from homeassistant.exceptions import TemplateError
-import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.entity import async_generate_entity_id
-from homeassistant.helpers.script import Script
-from homeassistant.components.template.template_entity import TemplateEntity
-from homeassistant.components.template.const import (
-    CONF_AVAILABILITY_TEMPLATE,
-    DOMAIN,
-    PLATFORMS,
-)
 from homeassistant.helpers.reload import async_setup_reload_service
+from homeassistant.helpers.script import Script
 
 # from . import extract_entities, initialise_templates
 

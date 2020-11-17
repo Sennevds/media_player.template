@@ -3,8 +3,8 @@ Template for media-player
 https://github.com/Sennevds/media_player.template
 """
 
-from itertools import chain
 import logging
+from itertools import chain
 
 from homeassistant.const import MATCH_ALL
 
