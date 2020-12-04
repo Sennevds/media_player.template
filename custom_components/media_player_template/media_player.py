@@ -21,6 +21,7 @@ from homeassistant.components.media_player.const import (
     SUPPORT_VOLUME_MUTE,
     SUPPORT_VOLUME_SET,
     SUPPORT_VOLUME_STEP,
+    SUPPORT_SEEK,
 )
 from homeassistant.components.template.const import (
     CONF_AVAILABILITY_TEMPLATE,
@@ -87,6 +88,9 @@ MEDIA_EPISODE_TEMPLATE = "media_episode_template"
 MEDIA_SEASON_TEMPLATE = "media_season_template"
 MEDIA_SERIES_TITLE_TEMPLATE = "media_series_title_template"
 MEDIA_ALBUM_ARTIST_TEMPLATE = "media_album_artist_template"
+SEEK_ACTION = "seek"
+CURRENT_POSITION_TEMPLATE = "current_position_template"
+MEDIA_DURATION_TEMPLATE = "media_duration_template"
 
 
 MEDIA_PLAYER_SCHEMA = vol.Schema(
@@ -122,6 +126,9 @@ MEDIA_PLAYER_SCHEMA = vol.Schema(
         vol.Optional(MEDIA_SEASON_TEMPLATE): cv.template,
         vol.Optional(MEDIA_SERIES_TITLE_TEMPLATE): cv.template,
         vol.Optional(MEDIA_ALBUM_ARTIST_TEMPLATE): cv.template,
+        vol.Optional(SEEK_ACTION): cv.SCRIPT_SCHEMA,
+        vol.Optional(CURRENT_POSITION_TEMPLATE): cv.template,
+        vol.Optional(MEDIA_DURATION_TEMPLATE): cv.template,
     }
 )
 SUPPORT_TEMPLATE = SUPPORT_TURN_OFF | SUPPORT_TURN_ON
@@ -173,6 +180,9 @@ async def _async_create_entities(hass, config):
         media_season_template = device_config.get(MEDIA_SEASON_TEMPLATE)
         media_series_title_template = device_config.get(MEDIA_SERIES_TITLE_TEMPLATE)
         media_album_artist_template = device_config.get(MEDIA_ALBUM_ARTIST_TEMPLATE)
+        seek_action = device_config.get(SEEK_ACTION)
+        current_position_template = device_config.get(CURRENT_POSITION_TEMPLATE)
+        media_duration_template = device_config.get(MEDIA_DURATION_TEMPLATE)
 
         media_players.append(
             MediaPlayerTemplate(
@@ -208,6 +218,9 @@ async def _async_create_entities(hass, config):
                 media_season_template,
                 media_series_title_template,
                 media_album_artist_template,
+                seek_action,
+                current_position_template,
+                media_duration_template,
             )
         )
     return media_players
@@ -250,6 +263,9 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         media_season_template,
         media_series_title_template,
         media_album_artist_template,
+        seek_action,
+        current_position_template,
+        media_duration_template,
     ):
         """Initialize the Template Media player."""
         super().__init__(
@@ -315,6 +331,10 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
                 hass, play_media_action, friendly_name, self._domain
             )
 
+        self._seek_script = None
+        if seek_action is not None:
+            self._seek_script = Script(hass, seek_action, friendly_name, self._domain)
+
         self._state = False
         self._icon = None
         self._entity_picture = None
@@ -336,6 +356,8 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         self._media_series_title_template = media_series_title_template
         self._media_album_artist_template = media_album_artist_template
         self._media_content_type_template = media_content_type_template
+        self._current_position_template = current_position_template
+        self._media_duration_template = media_duration_template
 
         self._track_name = None
         self._track_artist = None
@@ -348,6 +370,8 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         self._media_series_title = None
         self._media_album_artist = None
         self._media_content_type = None
+        self._current_position = None
+        self._media_duration = None
 
     async def async_added_to_hass(self):
         """Register callbacks."""
@@ -391,6 +415,14 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         if self._media_album_artist_template is not None:
             self.add_template_attribute(
                 "_media_album_artist", self._media_album_artist_template
+            )
+        if self._current_position_template is not None:
+            self.add_template_attribute(
+                "_current_position", self._current_position_template
+            )
+        if self._media_duration_template is not None:
+            self.add_template_attribute(
+                "_media_duration", self._media_duration_template
             )
         await super().async_added_to_hass()
 
@@ -449,6 +481,8 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
             support |= SUPPORT_VOLUME_SET
         if self._play_media_script is not None:
             support |= SUPPORT_PLAY_MEDIA
+        if self._seek_script is not None:
+            support |= SUPPORT_SEEK
         return support
 
     @property
@@ -509,6 +543,10 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         await self._play_media_script.async_run(
             {"media_type": media_type, "media_id": media_id}, context=self._context
         )
+
+    async def async_media_seek(self, position):
+        """Send seek command."""
+        await self._seek_script.async_run({"position": position}, context=self._context)
 
     @property
     def state(self):
@@ -598,6 +636,19 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         """If the image url is remotely accessible."""
         return True
 
+    @property
+    def media_position(self):
+        """Position of current playing media in seconds."""
+        if self._state == "playing" or self._state == "paused":
+            return self._current_position
+        return None
+
+    @property
+    def media_duration(self):
+        if self._state == "playing" or self._state == "paused":
+            return self._media_duration
+        return None
+
     async def async_select_source(self, source):
         """Set the input source."""
         if source in self._input_templates:
@@ -640,6 +691,8 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
             ("_track_artist", self._artist_template),
             ("_track_album_name", self._album_template),
             ("_album_art", self._album_art_template),
+            ("_current_positon", self._current_position),
+            ("_media_duration", self._media_duration),
         ):
             if template is None:
                 continue
