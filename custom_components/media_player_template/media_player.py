@@ -22,6 +22,7 @@ from homeassistant.components.media_player.const import (
     SUPPORT_VOLUME_SET,
     SUPPORT_VOLUME_STEP,
     SUPPORT_SEEK,
+    SUPPORT_SELECT_SOUND_MODE,
 )
 from homeassistant.components.template.const import (
     CONF_AVAILABILITY_TEMPLATE,
@@ -91,6 +92,8 @@ MEDIA_ALBUM_ARTIST_TEMPLATE = "media_album_artist_template"
 SEEK_ACTION = "seek"
 CURRENT_POSITION_TEMPLATE = "current_position_template"
 MEDIA_DURATION_TEMPLATE = "media_duration_template"
+CURRENT_SOUND_MODE_TEMPLATE = "current_sound_mode_template"
+CONF_SOUND_MODES = "sound_modes"
 
 
 MEDIA_PLAYER_SCHEMA = vol.Schema(
@@ -129,6 +132,8 @@ MEDIA_PLAYER_SCHEMA = vol.Schema(
         vol.Optional(SEEK_ACTION): cv.SCRIPT_SCHEMA,
         vol.Optional(CURRENT_POSITION_TEMPLATE): cv.template,
         vol.Optional(MEDIA_DURATION_TEMPLATE): cv.template,
+        vol.Optional(CONF_SOUND_MODES, default={}): {cv.string: cv.SCRIPT_SCHEMA},
+        vol.Optional(CURRENT_SOUND_MODE_TEMPLATE): cv.template,
     }
 )
 SUPPORT_TEMPLATE = SUPPORT_TURN_OFF | SUPPORT_TURN_ON
@@ -183,6 +188,8 @@ async def _async_create_entities(hass, config):
         seek_action = device_config.get(SEEK_ACTION)
         current_position_template = device_config.get(CURRENT_POSITION_TEMPLATE)
         media_duration_template = device_config.get(MEDIA_DURATION_TEMPLATE)
+        sound_mode_templates = device_config[CONF_SOUND_MODES]
+        current_sound_mode_template = device_config.get(CURRENT_SOUND_MODE_TEMPLATE)
 
         media_players.append(
             MediaPlayerTemplate(
@@ -221,6 +228,8 @@ async def _async_create_entities(hass, config):
                 seek_action,
                 current_position_template,
                 media_duration_template,
+                sound_mode_templates,
+                current_sound_mode_template,
             )
         )
     return media_players
@@ -266,6 +275,8 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         seek_action,
         current_position_template,
         media_duration_template,
+        sound_mode_templates,
+        current_sound_mode_template,
     ):
         """Initialize the Template Media player."""
         super().__init__(
@@ -359,6 +370,11 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         self._current_position_template = current_position_template
         self._media_duration_template = media_duration_template
 
+        self._sound_mode_templates = sound_mode_templates
+        self._current_sound_mode_template = current_sound_mode_template
+        self._sound_mode = None
+        self._sound_mode_list = list(sound_mode_templates.keys())
+
         self._track_name = None
         self._track_artist = None
         self._track_album_name = None
@@ -424,6 +440,11 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
             self.add_template_attribute(
                 "_media_duration", self._media_duration_template
             )
+        if self._current_sound_mode_template is not None:
+            self.add_template_attribute(
+                "_sound_mode", self._current_sound_mode_template
+            )
+
         await super().async_added_to_hass()
 
     @callback
@@ -483,6 +504,8 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
             support |= SUPPORT_PLAY_MEDIA
         if self._seek_script is not None:
             support |= SUPPORT_SEEK
+        if self._sound_mode_list is not None:
+            support |= SUPPORT_SELECT_SOUND_MODE
         return support
 
     @property
@@ -649,6 +672,22 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
             return self._media_duration
         return None
 
+    @property
+    def sound_mode(self):
+        """Return the current input source."""
+        try:
+            if self._current_sound_mode_template is not None:
+                self._curre = self._current_sound_mode_template.async_render()
+            return self._sound_mode
+        except TemplateError as ex:
+            _LOGGER.error(ex)
+            return None
+
+    @property
+    def sound_mode_list(self):
+        """Return a list of available sound modes."""
+        return self._sound_mode_list
+
     async def async_select_source(self, source):
         """Set the input source."""
         if source in self._input_templates:
@@ -659,6 +698,20 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
                 self._current_source = source
                 self.async_write_ha_state()
             await source_script.async_run(context=self._context)
+
+    async def async_select_sound_mode(self, sound_mode):
+        """Select sound mode."""
+        if sound_mode in self._sound_mode_templates:
+            sound_mode_script = Script(
+                self.hass,
+                self._sound_mode_templates[sound_mode],
+                self._name,
+                self._domain,
+            )
+            if self._current_sound_mode_template is None:
+                self._sound_mode = sound_mode
+                self.async_write_ha_state()
+            await sound_mode_script.async_run(context=self._context)
 
     async def async_update(self):
         """Update the state from the template."""
