@@ -94,12 +94,14 @@ CURRENT_POSITION_TEMPLATE = "current_position_template"
 MEDIA_DURATION_TEMPLATE = "media_duration_template"
 CURRENT_SOUND_MODE_TEMPLATE = "current_sound_mode_template"
 CONF_SOUND_MODES = "sound_modes"
+CONF_UNIQUE_ID = "unique_id"
 
 
 MEDIA_PLAYER_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_VALUE_TEMPLATE): cv.template,
         vol.Optional(CONF_ICON_TEMPLATE): cv.template,
+        vol.Optional(CONF_UNIQUE_ID): cv.string,
         vol.Optional(CONF_ENTITY_PICTURE_TEMPLATE): cv.template,
         vol.Optional(CONF_AVAILABILITY_TEMPLATE): cv.template,
         vol.Optional(CURRENT_SOURCE_TEMPLATE): cv.template,
@@ -158,6 +160,7 @@ async def _async_create_entities(hass, config):
         friendly_name = device_config.get(ATTR_FRIENDLY_NAME, device)
         state_template = device_config[CONF_VALUE_TEMPLATE]
         icon_template = device_config.get(CONF_ICON_TEMPLATE)
+        unique_id = device_config.get(CONF_UNIQUE_ID)
         entity_picture_template = device_config.get(CONF_ENTITY_PICTURE_TEMPLATE)
         availability_template = device_config.get(CONF_AVAILABILITY_TEMPLATE)
         current_source_template = device_config.get(CURRENT_SOURCE_TEMPLATE)
@@ -198,6 +201,7 @@ async def _async_create_entities(hass, config):
                 friendly_name,
                 state_template,
                 icon_template,
+                unique_id,
                 entity_picture_template,
                 availability_template,
                 current_source_template,
@@ -245,6 +249,7 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         friendly_name,
         state_template,
         icon_template,
+        unique_id,
         entity_picture_template,
         availability_template,
         current_source_template,
@@ -348,6 +353,9 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
 
         self._state = False
         self._icon = None
+        self._unique_id =None
+        if unique_id is not None:
+            self._unique_id = unique_id
         self._entity_picture = None
         self._available = True
         self._input_templates = input_templates
@@ -603,7 +611,12 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
     def source_list(self):
         """List of available input sources."""
         return self._source_list
-
+    
+    @property
+    def unique_id(self):
+        """Unique id."""
+        return self._unique_id
+    
     @property
     def volume_level(self):
         """Volume level of the media player (0..1)."""
