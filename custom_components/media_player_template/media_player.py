@@ -434,7 +434,7 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
             self.add_template_attribute("_media_season", self._media_season_template)
         if self._media_series_title_template is not None:
             self.add_template_attribute(
-                "_media_series", self._media_series_title_template
+                "_media_series_title", self._media_series_title_template
             )
         if self._media_album_artist_template is not None:
             self.add_template_attribute(
