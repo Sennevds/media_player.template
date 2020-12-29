@@ -1,5 +1,10 @@
 """Support for switches which integrates with other components."""
 import logging
+from homeassistant.components.kodi.browse_media import (
+    library_payload,
+    build_item_response,
+)
+from homeassistant.components.media_player.errors import BrowseError
 
 import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
@@ -23,6 +28,7 @@ from homeassistant.components.media_player.const import (
     SUPPORT_VOLUME_MUTE,
     SUPPORT_VOLUME_SET,
     SUPPORT_VOLUME_STEP,
+    SUPPORT_BROWSE_MEDIA,
 )
 from homeassistant.components.template.const import (
     CONF_AVAILABILITY_TEMPLATE,
@@ -95,6 +101,8 @@ MEDIA_DURATION_TEMPLATE = "media_duration_template"
 CURRENT_SOUND_MODE_TEMPLATE = "current_sound_mode_template"
 CONF_SOUND_MODES = "sound_modes"
 CONF_UNIQUE_ID = "unique_id"
+BROWSE_MEDIA_DOMAIN_TEMPLATE = "browse_media_domain_template"
+BROWSE_MEDIA_CONF_ENTRY_TEMPLATE = "browse_media_conf_entry_template"
 
 
 MEDIA_PLAYER_SCHEMA = vol.Schema(
@@ -120,6 +128,8 @@ MEDIA_PLAYER_SCHEMA = vol.Schema(
         vol.Optional(ATTR_ENTITY_ID): cv.entity_ids,
         vol.Optional(SET_VOLUME_ACTION): cv.SCRIPT_SCHEMA,
         vol.Optional(PLAY_MEDIA_ACTION): cv.SCRIPT_SCHEMA,
+        vol.Optional(BROWSE_MEDIA_CONF_ENTRY_TEMPLATE): cv.template,
+        vol.Optional(BROWSE_MEDIA_DOMAIN_TEMPLATE): cv.template,
         vol.Optional(TITLE_TEMPLATE): cv.template,
         vol.Optional(ARTIST_TEMPLATE): cv.template,
         vol.Optional(ALBUM_TEMPLATE): cv.template,
@@ -182,6 +192,8 @@ async def _async_create_entities(hass, config):
         album_art_template = device_config.get(ALBUM_ART_TEMPLATE)
         set_volume_action = device_config.get(SET_VOLUME_ACTION)
         play_media_action = device_config.get(PLAY_MEDIA_ACTION)
+        browse_media_domain_template = device_config.get(BROWSE_MEDIA_DOMAIN_TEMPLATE)
+        browse_media_conf_entry_template = device_config.get(BROWSE_MEDIA_CONF_ENTRY_TEMPLATE)
         media_content_type_template = device_config.get(MEDIA_CONTENT_TYPE_TEMPLATE)
         media_image_url_template = device_config.get(MEDIA_IMAGE_URL_TEMPLATE)
         media_episode_template = device_config.get(MEDIA_EPISODE_TEMPLATE)
@@ -223,6 +235,8 @@ async def _async_create_entities(hass, config):
                 album_art_template,
                 set_volume_action,
                 play_media_action,
+                browse_media_domain_template,
+                browse_media_conf_entry_template,
                 media_content_type_template,
                 media_image_url_template,
                 media_episode_template,
@@ -271,6 +285,8 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         album_art_template,
         set_volume_action,
         play_media_action,
+        browse_media_domain_template,
+        browse_media_conf_entry_template,
         media_content_type_template,
         media_image_url_template,
         media_episode_template,
@@ -377,6 +393,8 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         self._media_content_type_template = media_content_type_template
         self._current_position_template = current_position_template
         self._media_duration_template = media_duration_template
+        self._browse_media_domain_template = browse_media_domain_template
+        self._browse_media_conf_entry_template = browse_media_conf_entry_template
 
         self._sound_mode_templates = sound_mode_templates
         self._current_sound_mode_template = current_sound_mode_template
@@ -394,6 +412,8 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         self._media_series_title = None
         self._media_album_artist = None
         self._media_content_type = None
+        self._browse_media_conf_entry = None
+        self._browse_media_domain = None
         self._current_position = None
         self._media_duration = None
 
@@ -447,6 +467,14 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         if self._media_duration_template is not None:
             self.add_template_attribute(
                 "_media_duration", self._media_duration_template
+            )
+        if self._browse_media_domain_template is not None:
+            self.add_template_attribute(
+                "_browse_media_domain", self._browse_media_domain_template
+            )
+        if self._browse_media_conf_entry_template is not None:
+            self.add_template_attribute(
+                "_browse_media_conf_entry", self._browse_media_conf_entry_template
             )
         if self._current_sound_mode_template is not None:
             self.add_template_attribute(
@@ -510,6 +538,8 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
             support |= SUPPORT_VOLUME_SET
         if self._play_media_script is not None:
             support |= SUPPORT_PLAY_MEDIA
+        if self._browse_media_domain is not None:
+            support |= SUPPORT_BROWSE_MEDIA
         if self._seek_script is not None:
             support |= SUPPORT_SEEK
         if self._sound_mode_list is not None:
@@ -573,6 +603,36 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         """play media"""
         await self._play_media_script.async_run(
             {"media_type": media_type, "media_id": media_id}, context=self._context
+        )
+
+    async def async_browse_media(self, media_content_type=None, media_content_id=None):
+        """Implement the websocket media browsing helper."""
+
+        if self._browse_media_domain  == "kodi":
+            component = self.hass.data[self._browse_media_domain]
+
+            for item in component:
+                if self._browse_media_conf_entry == item:
+                    kodi_data = component[item]
+
+                    if media_content_type in [None, "library"]:
+                        return await self.hass.async_add_executor_job(library_payload, kodi_data["kodi"])
+
+                    payload = {
+                        "search_type": media_content_type,
+                        "search_id": media_content_id,
+                    }
+                    response = await build_item_response(kodi_data["kodi"], payload)
+                    if response is None:
+                        raise BrowseError(
+                            f"Media not found: {media_content_type} / {media_content_id}"
+                        )
+                    return response
+            raise BrowseError(
+                f"Entry not found: {self._browse_media_conf_entry}"
+            )
+        raise BrowseError(
+            f"Domain not supported: {self._browse_media_domain}"
         )
 
     async def async_media_seek(self, position):
