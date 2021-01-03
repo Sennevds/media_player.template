@@ -5,6 +5,6 @@
     "issue_tracker": "https://github.com/Sennevds/media_player.template/issues",
     "requirements": [],
     "dependencies": [],
-    "after_dependencies": ["template"],
+    "after_dependencies": ["kodi", "template"],
     "codeowners": ["@Sennevds"]
   }
