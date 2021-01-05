@@ -1,6 +1,6 @@
 {
-    "python.pythonPath": "C:\\Python37\\python.exe",
+    "python.pythonPath": "C:\\Program Files\\Python39\\python.exe",
     "files.associations": {
-        "*.yaml": "home-assistant"
+        "*.yaml": "python"
     }
 }

@@ -3,6 +3,7 @@ import logging
 
 import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
+import homeassistant.util.dt as dt_util
 from homeassistant.components.media_player import (
     ENTITY_ID_FORMAT,
     PLATFORM_SCHEMA,
@@ -141,7 +142,8 @@ MEDIA_PLAYER_SCHEMA = vol.Schema(
 SUPPORT_TEMPLATE = SUPPORT_TURN_OFF | SUPPORT_TURN_ON
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
-    {vol.Required(CONF_MEDIAPLAYER): cv.schema_with_slug_keys(MEDIA_PLAYER_SCHEMA)}
+    {vol.Required(CONF_MEDIAPLAYER)
+                  : cv.schema_with_slug_keys(MEDIA_PLAYER_SCHEMA)}
 )
 
 
@@ -161,7 +163,8 @@ async def _async_create_entities(hass, config):
         state_template = device_config[CONF_VALUE_TEMPLATE]
         icon_template = device_config.get(CONF_ICON_TEMPLATE)
         unique_id = device_config.get(CONF_UNIQUE_ID)
-        entity_picture_template = device_config.get(CONF_ENTITY_PICTURE_TEMPLATE)
+        entity_picture_template = device_config.get(
+            CONF_ENTITY_PICTURE_TEMPLATE)
         availability_template = device_config.get(CONF_AVAILABILITY_TEMPLATE)
         current_source_template = device_config.get(CURRENT_SOURCE_TEMPLATE)
         on_action = device_config[ON_ACTION]
@@ -182,17 +185,22 @@ async def _async_create_entities(hass, config):
         album_art_template = device_config.get(ALBUM_ART_TEMPLATE)
         set_volume_action = device_config.get(SET_VOLUME_ACTION)
         play_media_action = device_config.get(PLAY_MEDIA_ACTION)
-        media_content_type_template = device_config.get(MEDIA_CONTENT_TYPE_TEMPLATE)
+        media_content_type_template = device_config.get(
+            MEDIA_CONTENT_TYPE_TEMPLATE)
         media_image_url_template = device_config.get(MEDIA_IMAGE_URL_TEMPLATE)
         media_episode_template = device_config.get(MEDIA_EPISODE_TEMPLATE)
         media_season_template = device_config.get(MEDIA_SEASON_TEMPLATE)
-        media_series_title_template = device_config.get(MEDIA_SERIES_TITLE_TEMPLATE)
-        media_album_artist_template = device_config.get(MEDIA_ALBUM_ARTIST_TEMPLATE)
+        media_series_title_template = device_config.get(
+            MEDIA_SERIES_TITLE_TEMPLATE)
+        media_album_artist_template = device_config.get(
+            MEDIA_ALBUM_ARTIST_TEMPLATE)
         seek_action = device_config.get(SEEK_ACTION)
-        current_position_template = device_config.get(CURRENT_POSITION_TEMPLATE)
+        current_position_template = device_config.get(
+            CURRENT_POSITION_TEMPLATE)
         media_duration_template = device_config.get(MEDIA_DURATION_TEMPLATE)
         sound_mode_templates = device_config[CONF_SOUND_MODES]
-        current_sound_mode_template = device_config.get(CURRENT_SOUND_MODE_TEMPLATE)
+        current_sound_mode_template = device_config.get(
+            CURRENT_SOUND_MODE_TEMPLATE)
 
         media_players.append(
             MediaPlayerTemplate(
@@ -297,22 +305,27 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         self._template = state_template
         self._domain = __name__.split(".")[-2]
         self._on_script = Script(hass, on_action, friendly_name, self._domain)
-        self._off_script = Script(hass, off_action, friendly_name, self._domain)
+        self._off_script = Script(
+            hass, off_action, friendly_name, self._domain)
         self._play_script = None
         if play_action is not None:
-            self._play_script = Script(hass, play_action, friendly_name, self._domain)
+            self._play_script = Script(
+                hass, play_action, friendly_name, self._domain)
 
         self._stop_script = None
         if stop_action is not None:
-            self._stop_script = Script(hass, stop_action, friendly_name, self._domain)
+            self._stop_script = Script(
+                hass, stop_action, friendly_name, self._domain)
 
         self._pause_script = None
         if pause_action is not None:
-            self._pause_script = Script(hass, pause_action, friendly_name, self._domain)
+            self._pause_script = Script(
+                hass, pause_action, friendly_name, self._domain)
 
         self._next_script = None
         if next_action is not None:
-            self._next_script = Script(hass, next_action, friendly_name, self._domain)
+            self._next_script = Script(
+                hass, next_action, friendly_name, self._domain)
 
         self._previous_script = None
         if previous_action is not None:
@@ -334,7 +347,8 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
 
         self._mute_script = None
         if mute_action is not None:
-            self._mute_script = Script(hass, mute_action, friendly_name, self._domain)
+            self._mute_script = Script(
+                hass, mute_action, friendly_name, self._domain)
 
         self._set_volume_script = None
         if set_volume_action is not None:
@@ -349,7 +363,8 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
 
         self._seek_script = None
         if seek_action is not None:
-            self._seek_script = Script(hass, seek_action, friendly_name, self._domain)
+            self._seek_script = Script(
+                hass, seek_action, friendly_name, self._domain)
 
         self._state = False
         self._icon = None
@@ -396,10 +411,12 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         self._media_content_type = None
         self._current_position = None
         self._media_duration = None
+        self._last_update = None
 
     async def async_added_to_hass(self):
         """Register callbacks."""
-        self.add_template_attribute("_state", self._template, None, self._update_state)
+        self.add_template_attribute(
+            "_state", self._template, None, self._update_state)
 
         if self._current_source_template is not None:
             self.add_template_attribute(
@@ -413,10 +430,12 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
             self.add_template_attribute("_track_artist", self._artist_template)
 
         if self._album_template is not None:
-            self.add_template_attribute("_track_album_name", self._album_template)
+            self.add_template_attribute(
+                "_track_album_name", self._album_template)
 
         if self._current_volume_template is not None:
-            self.add_template_attribute("_volume", self._current_volume_template)
+            self.add_template_attribute(
+                "_volume", self._current_volume_template)
 
         if self._album_art_template is not None:
             self.add_template_attribute("_album_art", self._album_art_template)
@@ -429,9 +448,11 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
                 "_media_image_url", self._media_image_url_template
             )
         if self._media_episode_template is not None:
-            self.add_template_attribute("_media_episode", self._media_episode_template)
+            self.add_template_attribute(
+                "_media_episode", self._media_episode_template)
         if self._media_season_template is not None:
-            self.add_template_attribute("_media_season", self._media_season_template)
+            self.add_template_attribute(
+                "_media_season", self._media_season_template)
         if self._media_series_title_template is not None:
             self.add_template_attribute(
                 "_media_series_title", self._media_series_title_template
@@ -520,6 +541,13 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
     def available(self) -> bool:
         """Return if the device is available."""
         return self._available
+
+    @property
+    def media_position_updated_at(self):
+        """When was the position of the current playing media valid.
+        Returns value from homeassistant.util.dt.utcnow().
+        """
+        return self._last_update
 
     async def async_turn_on(self):
         """Fire the on action."""
@@ -676,6 +704,7 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
     def media_position(self):
         """Position of current playing media in seconds."""
         if self._state == "playing" or self._state == "paused":
+            self._last_update = dt_util.utcnow()
             return self._current_position
         return None
 
@@ -767,6 +796,11 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
                 value = template.async_render()
                 if property_name == "_available":
                     value = value.lower() == "true"
+                if (
+                    property_name == "_current_positon"
+                    and value != self._current_position
+                ):
+                    self._last_update = dt_util.utcnow()
                 setattr(self, property_name, value)
             except TemplateError as ex:
                 friendly_property_name = property_name[1:].replace("_", " ")
@@ -782,7 +816,8 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
                     return
 
                 try:
-                    setattr(self, property_name, getattr(super(), property_name))
+                    setattr(self, property_name, getattr(
+                        super(), property_name))
                 except AttributeError:
                     _LOGGER.error(
                         "Could not render %s template %s: %s",
