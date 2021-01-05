@@ -2,6 +2,7 @@
 import logging
 
 import homeassistant.helpers.config_validation as cv
+import homeassistant.util.dt as dt_util
 import voluptuous as vol
 from homeassistant.components.media_player import (
     ENTITY_ID_FORMAT,
@@ -396,6 +397,7 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         self._media_content_type = None
         self._current_position = None
         self._media_duration = None
+        self._last_update = None
 
     async def async_added_to_hass(self):
         """Register callbacks."""
@@ -520,6 +522,13 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
     def available(self) -> bool:
         """Return if the device is available."""
         return self._available
+
+    @property
+    def media_position_updated_at(self):
+        """When was the position of the current playing media valid.
+        Returns value from homeassistant.util.dt.utcnow().
+        """
+        return self._last_update
 
     async def async_turn_on(self):
         """Fire the on action."""
@@ -676,6 +685,7 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
     def media_position(self):
         """Position of current playing media in seconds."""
         if self._state == "playing" or self._state == "paused":
+            self._last_update = dt_util.utcnow()
             return self._current_position
         return None
 
@@ -767,6 +777,11 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
                 value = template.async_render()
                 if property_name == "_available":
                     value = value.lower() == "true"
+                if (
+                    property_name == "_current_positon"
+                    and value != self._current_position
+                ):
+                    self._last_update = dt_util.utcnow()
                 setattr(self, property_name, value)
             except TemplateError as ex:
                 friendly_property_name = property_name[1:].replace("_", " ")
