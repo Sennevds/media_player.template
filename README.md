@@ -37,6 +37,7 @@ Current implemented features:
 * media_season_template
 * media_series_title_template
 * media_album_artist_template
+* current_is_muted_template
 
 media_content_type_template can be one of the following values:
 * tv_show
@@ -49,6 +50,9 @@ based on this value other parameters are shown ex artist is only shown when type
 ## Variables used:
 set_volume:
 * {volume}
+
+mute:
+* {is_muted}
 
 play_media:
 * {media_type}
@@ -99,6 +103,13 @@ media_player:
           data:
             entity_id: input_text.selected_volume
             value: "{{volume}}"
+        mute:
+          service: input_number.set_value
+          data:
+            entity_id: input_number.selected_is_muted
+            value: "{{is_muted}}"
+        current_is_muted_template: >
+          {{ states('input_boolean.is_muted') }}
         album_art_template: "{{ states('input_text.album_art') }}"
         title_template: "{{ states('input_text.title') }}"
         album_template: "{{ states('input_text.album') }}"

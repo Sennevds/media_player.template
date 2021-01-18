@@ -81,6 +81,7 @@ TITLE_TEMPLATE = "title_template"
 ARTIST_TEMPLATE = "artist_template"
 ALBUM_TEMPLATE = "album_template"
 CURRENT_VOLUME_TEMPLATE = "current_volume_template"
+CURRENT_IS_MUTED_TEMPLATE = "current_is_muted_template"
 ALBUM_ART_TEMPLATE = "album_art_template"
 SET_VOLUME_ACTION = "set_volume"
 PLAY_MEDIA_ACTION = "play_media"
@@ -125,6 +126,7 @@ MEDIA_PLAYER_SCHEMA = vol.Schema(
         vol.Optional(ARTIST_TEMPLATE): cv.template,
         vol.Optional(ALBUM_TEMPLATE): cv.template,
         vol.Optional(CURRENT_VOLUME_TEMPLATE): cv.template,
+        vol.Optional(CURRENT_IS_MUTED_TEMPLATE): cv.template,
         vol.Optional(ALBUM_ART_TEMPLATE): cv.template,
         vol.Optional(MEDIA_CONTENT_TYPE_TEMPLATE): cv.template,
         vol.Optional(MEDIA_IMAGE_URL_TEMPLATE): cv.template,
@@ -180,6 +182,7 @@ async def _async_create_entities(hass, config):
         artist_template = device_config.get(ARTIST_TEMPLATE)
         album_template = device_config.get(ALBUM_TEMPLATE)
         current_volume_template = device_config.get(CURRENT_VOLUME_TEMPLATE)
+        current_is_muted_template = device_config.get(CURRENT_IS_MUTED_TEMPLATE)
         album_art_template = device_config.get(ALBUM_ART_TEMPLATE)
         set_volume_action = device_config.get(SET_VOLUME_ACTION)
         play_media_action = device_config.get(PLAY_MEDIA_ACTION)
@@ -221,6 +224,7 @@ async def _async_create_entities(hass, config):
                 artist_template,
                 album_template,
                 current_volume_template,
+                current_is_muted_template,
                 album_art_template,
                 set_volume_action,
                 play_media_action,
@@ -269,6 +273,7 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         artist_template,
         album_template,
         current_volume_template,
+        current_is_muted_template,
         album_art_template,
         set_volume_action,
         play_media_action,
@@ -368,6 +373,7 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         self._artist_template = artist_template
         self._album_template = album_template
         self._current_volume_template = current_volume_template
+        self._current_is_muted_template = current_is_muted_template
         self._album_art_template = album_art_template
         self._media_content_type_template = media_content_type_template
         self._media_image_url_template = media_image_url_template
@@ -389,6 +395,7 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         self._track_album_name = None
         self._album_art = None
         self._volume = None
+        self._is_muted = None
         self._media_image_url = None
         self._media_episode = None
         self._media_season = None
@@ -419,6 +426,9 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
 
         if self._current_volume_template is not None:
             self.add_template_attribute("_volume", self._current_volume_template)
+
+        if self._current_is_muted_template is not None:
+            self.add_template_attribute("_is_muted", self._current_is_muted_template)
 
         if self._album_art_template is not None:
             self.add_template_attribute("_album_art", self._album_art_template)
@@ -547,8 +557,13 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         await self._volume_down_script.async_run(context=self._context)
 
     async def async_mute_volume(self, mute):
-        """Fire the off action."""
-        await self._mute_script.async_run(context=self._context)
+        """Set the is_muted state."""
+        if self._current_is_muted_template is None:
+            self._is_muted = mute
+            self.async_write_ha_state()
+        await self._mute_script.async_run(
+            {"is_muted": mute}, context=self._context
+        )
 
     async def async_media_play(self):
         """Fire the off action."""
@@ -630,6 +645,11 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
     def volume_level(self):
         """Volume level of the media player (0..1)."""
         return self._volume
+
+    @property
+    def is_volume_muted(self):
+        """Boolean if volume is currently muted."""
+        return self._is_muted
 
     @property
     def media_title(self):
@@ -763,6 +783,7 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
             ("_entity_picture", self._entity_picture_template),
             ("_available", self._availability_template),
             ("_volume", self._current_volume_template),
+            ("_is_muted", self._current_is_muted_template),
             ("_track_name", self._title_template),
             ("_track_artist", self._artist_template),
             ("_track_album_name", self._album_template),
