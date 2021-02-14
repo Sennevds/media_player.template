@@ -34,6 +34,7 @@ from homeassistant.components.template.template_entity import TemplateEntity
 from homeassistant.const import (
     ATTR_ENTITY_ID,
     ATTR_FRIENDLY_NAME,
+    CONF_DEVICE_CLASS,
     CONF_ENTITY_PICTURE_TEMPLATE,
     CONF_ICON_TEMPLATE,
     CONF_VALUE_TEMPLATE,
@@ -103,6 +104,7 @@ MEDIA_PLAYER_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_VALUE_TEMPLATE): cv.template,
         vol.Optional(CONF_ICON_TEMPLATE): cv.template,
+        vol.Optional(CONF_DEVICE_CLASS): cv.string,
         vol.Optional(CONF_UNIQUE_ID): cv.string,
         vol.Optional(CONF_ENTITY_PICTURE_TEMPLATE): cv.template,
         vol.Optional(CONF_AVAILABILITY_TEMPLATE): cv.template,
@@ -161,6 +163,7 @@ async def _async_create_entities(hass, config):
 
     for device, device_config in config[CONF_MEDIAPLAYER].items():
         friendly_name = device_config.get(ATTR_FRIENDLY_NAME, device)
+        device_class = device_config.get(CONF_DEVICE_CLASS, device)
         state_template = device_config[CONF_VALUE_TEMPLATE]
         icon_template = device_config.get(CONF_ICON_TEMPLATE)
         unique_id = device_config.get(CONF_UNIQUE_ID)
@@ -203,6 +206,7 @@ async def _async_create_entities(hass, config):
                 hass,
                 device,
                 friendly_name,
+                device_class,
                 state_template,
                 icon_template,
                 unique_id,
@@ -252,6 +256,7 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         hass,
         device_id,
         friendly_name,
+        device_class,
         state_template,
         icon_template,
         unique_id,
@@ -300,6 +305,7 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
             ENTITY_ID_FORMAT, device_id, hass=hass
         )
         self._name = friendly_name
+        self._device_class = device_class
         self._template = state_template
         self._domain = __name__.split(".")[-2]
         self._on_script = Script(hass, on_action, friendly_name, self._domain)
@@ -476,6 +482,11 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
     def name(self):
         """Return the name of the switch."""
         return self._name
+    
+    @property
+    def device_class(self):
+        """Return the class of this device."""
+        return self._device_class
 
     @property
     def is_on(self):
