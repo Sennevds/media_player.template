@@ -38,6 +38,7 @@ Current implemented features:
 * media_series_title_template
 * media_album_artist_template
 * current_is_muted_template
+* device_class
 
 media_content_type_template can be one of the following values:
 * tv_show
@@ -66,6 +67,7 @@ media_player:
     media_players:
       receiver:
         friendly_name: Receiver
+        device_class: receiver
         current_source_template: "{{ states('input_text.selected_source') }}"
         value_template: >
           {% if is_state("input_boolean.receiver_on", "on") -%}
