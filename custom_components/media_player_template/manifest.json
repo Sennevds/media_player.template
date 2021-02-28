@@ -6,5 +6,6 @@
     "requirements": [],
     "dependencies": [],
     "after_dependencies": ["template"],
-    "codeowners": ["@Sennevds"]
+    "codeowners": ["@Sennevds"],
+    "version": "1.0.0"
   }
