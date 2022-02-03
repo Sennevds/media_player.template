@@ -296,6 +296,7 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
     ):
         """Initialize the Template Media player."""
         super().__init__(
+            hass,
             availability_template=availability_template,
             icon_template=icon_template,
             entity_picture_template=entity_picture_template,
