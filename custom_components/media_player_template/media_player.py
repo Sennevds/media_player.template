@@ -7,6 +7,8 @@ import voluptuous as vol
 from homeassistant.components.media_player import (
     ENTITY_ID_FORMAT,
     PLATFORM_SCHEMA,
+    BrowseMedia,
+    MediaType,
     MediaPlayerEntity,
 )
 from homeassistant.components.media_player.const import (
@@ -98,6 +100,7 @@ MEDIA_DURATION_TEMPLATE = "media_duration_template"
 CURRENT_SOUND_MODE_TEMPLATE = "current_sound_mode_template"
 CONF_SOUND_MODES = "sound_modes"
 CONF_UNIQUE_ID = "unique_id"
+LINK_EXPLICIT = "media_link_explicit"
 
 
 MEDIA_PLAYER_SCHEMA = vol.Schema(
@@ -109,8 +112,8 @@ MEDIA_PLAYER_SCHEMA = vol.Schema(
         vol.Optional(CONF_ENTITY_PICTURE_TEMPLATE): cv.template,
         vol.Optional(CONF_AVAILABILITY_TEMPLATE): cv.template,
         vol.Optional(CURRENT_SOURCE_TEMPLATE): cv.template,
-        vol.Optional(ON_ACTION): cv.SCRIPT_SCHEMA,
-        vol.Optional(OFF_ACTION): cv.SCRIPT_SCHEMA,
+        vol.Required(ON_ACTION): cv.SCRIPT_SCHEMA,
+        vol.Required(OFF_ACTION): cv.SCRIPT_SCHEMA,
         vol.Optional(PLAY_ACTION): cv.SCRIPT_SCHEMA,
         vol.Optional(STOP_ACTION): cv.SCRIPT_SCHEMA,
         vol.Optional(PAUSE_ACTION): cv.SCRIPT_SCHEMA,
@@ -141,8 +144,10 @@ MEDIA_PLAYER_SCHEMA = vol.Schema(
         vol.Optional(MEDIA_DURATION_TEMPLATE): cv.template,
         vol.Optional(CONF_SOUND_MODES, default={}): {cv.string: cv.SCRIPT_SCHEMA},
         vol.Optional(CURRENT_SOUND_MODE_TEMPLATE): cv.template,
+        vol.Optional(LINK_EXPLICIT, default=True): cv.boolean,
     }
 )
+SUPPORT_TEMPLATE = SUPPORT_TURN_OFF | SUPPORT_TURN_ON
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {vol.Required(CONF_MEDIAPLAYER): cv.schema_with_slug_keys(MEDIA_PLAYER_SCHEMA)}
@@ -169,8 +174,8 @@ async def _async_create_entities(hass, config):
         entity_picture_template = device_config.get(CONF_ENTITY_PICTURE_TEMPLATE)
         availability_template = device_config.get(CONF_AVAILABILITY_TEMPLATE)
         current_source_template = device_config.get(CURRENT_SOURCE_TEMPLATE)
-        on_action = device_config.get(ON_ACTION)
-        off_action = device_config.get(OFF_ACTION)
+        on_action = device_config[ON_ACTION]
+        off_action = device_config[OFF_ACTION]
         play_action = device_config.get(PLAY_ACTION)
         stop_action = device_config.get(STOP_ACTION)
         pause_action = device_config.get(PAUSE_ACTION)
@@ -199,6 +204,7 @@ async def _async_create_entities(hass, config):
         media_duration_template = device_config.get(MEDIA_DURATION_TEMPLATE)
         sound_mode_templates = device_config[CONF_SOUND_MODES]
         current_sound_mode_template = device_config.get(CURRENT_SOUND_MODE_TEMPLATE)
+        media_link_explicit = device_config.get(LINK_EXPLICIT)
 
         media_players.append(
             MediaPlayerTemplate(
@@ -242,6 +248,7 @@ async def _async_create_entities(hass, config):
                 media_duration_template,
                 sound_mode_templates,
                 current_sound_mode_template,
+                media_link_explicit
             )
         )
     return media_players
@@ -292,6 +299,7 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         media_duration_template,
         sound_mode_templates,
         current_sound_mode_template,
+        media_link_explicit
     ):
         """Initialize the Template Media player."""
         super().__init__(
@@ -308,15 +316,8 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         self._device_class = device_class
         self._template = state_template
         self._domain = __name__.split(".")[-2]
-
-        self._on_script = None
-        if on_action is not None:
-            self._on_script = Script(hass, on_action, friendly_name, self._domain)
-
-        self._off_script = None
-        if off_action is not None:
-            self._off_script = Script(hass, off_action, friendly_name, self._domain)
-
+        self._on_script = Script(hass, on_action, friendly_name, self._domain)
+        self._off_script = Script(hass, off_action, friendly_name, self._domain)
         self._play_script = None
         if play_action is not None:
             self._play_script = Script(hass, play_action, friendly_name, self._domain)
@@ -397,7 +398,7 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         self._media_content_type_template = media_content_type_template
         self._current_position_template = current_position_template
         self._media_duration_template = media_duration_template
-
+        self._media_link_explicit = media_link_explicit
         self._sound_mode_templates = sound_mode_templates
         self._current_sound_mode_template = current_sound_mode_template
         self._sound_mode = None
@@ -519,11 +520,7 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
     def supported_features(self):
         """Flag media player features that are supported."""
 
-        support = 0
-        if self._on_script is not None:
-            support |= SUPPORT_TURN_ON
-        if self._off_script is not None:
-            support |= SUPPORT_TURN_OFF
+        support = SUPPORT_TEMPLATE
         if self._play_script is not None:
             support |= SUPPORT_PLAY
         if self._stop_script is not None:
@@ -614,12 +611,43 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         await self._set_volume_script.async_run(
             {"volume": volume}, context=self._context
         )
+    async def async_browse_media(
+        self, media_content_type: str | None = None, media_content_id: str | None = None
+    ) -> BrowseMedia:
+        """Implement the websocket media browsing helper."""
+        # If your media player has no own media sources to browse, route all browse commands
+        # to the media source integration.
+        return await media_source.async_browse_media(
+            self.hass,
+            media_content_id,
+            # This allows filtering content. In this case it will only show audio sources.
+            content_filter=lambda item: item.media_content_type.startswith("audio/"),
+        )
 
-    async def async_play_media(self, media_type, media_id, **kwargs):
-        """play media"""
+    async def async_play_media(
+        self,
+        media_type: str,
+        media_id: str,
+        enqueue: MediaPlayerEnqueue | None = None,
+        announce: bool | None = None,
+        **kwargs,
+    ) -> None:
+        """Play a piece of media."""
+        if self._media_link_explicit and media_source.is_media_source_id(media_id):
+            media_type = MediaType.MUSIC
+            play_item = await media_source.async_resolve_media(
+                self.hass, media_id, self.entity_id
+            )
+            # play_item returns a relative URL if it has to be resolved on the Home Assistant host
+            # This call will turn it into a full URL
+            media_id = async_process_play_media_url(self.hass, play_item.url)
+
+        # Replace this with calling your media player play media function.
+        # await self._media_player.play_url(media_id)
         await self._play_media_script.async_run(
             {"media_type": media_type, "media_id": media_id}, context=self._context
         )
+    
 
     async def async_media_seek(self, position):
         """Send seek command."""
