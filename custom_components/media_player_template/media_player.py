@@ -4,12 +4,17 @@ import logging
 import homeassistant.helpers.config_validation as cv
 import homeassistant.util.dt as dt_util
 import voluptuous as vol
+from homeassistant.components import media_source
 from homeassistant.components.media_player import (
     ENTITY_ID_FORMAT,
     PLATFORM_SCHEMA,
     BrowseMedia,
     MediaType,
     MediaPlayerEntity,
+    MediaPlayerEnqueue,
+)
+from homeassistant.components.media_player.browse_media import (
+    async_process_play_media_url,
 )
 from homeassistant.components.media_player.const import (
     SUPPORT_NEXT_TRACK,
@@ -248,7 +253,7 @@ async def _async_create_entities(hass, config):
                 media_duration_template,
                 sound_mode_templates,
                 current_sound_mode_template,
-                media_link_explicit
+                media_link_explicit,
             )
         )
     return media_players
@@ -299,7 +304,7 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         media_duration_template,
         sound_mode_templates,
         current_sound_mode_template,
-        media_link_explicit
+        media_link_explicit,
     ):
         """Initialize the Template Media player."""
         super().__init__(
@@ -490,7 +495,7 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
     def name(self):
         """Return the name of the switch."""
         return self._name
-    
+
     @property
     def device_class(self):
         """Return the class of this device."""
@@ -580,9 +585,7 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         if self._current_is_muted_template is None:
             self._is_muted = mute
             self.async_write_ha_state()
-        await self._mute_script.async_run(
-            {"is_muted": mute}, context=self._context
-        )
+        await self._mute_script.async_run({"is_muted": mute}, context=self._context)
 
     async def async_media_play(self):
         """Fire the off action."""
@@ -611,6 +614,7 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         await self._set_volume_script.async_run(
             {"volume": volume}, context=self._context
         )
+
     async def async_browse_media(
         self, media_content_type: str | None = None, media_content_id: str | None = None
     ) -> BrowseMedia:
@@ -647,7 +651,6 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         await self._play_media_script.async_run(
             {"media_type": media_type, "media_id": media_id}, context=self._context
         )
-    
 
     async def async_media_seek(self, position):
         """Send seek command."""
