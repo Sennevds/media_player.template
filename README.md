@@ -10,112 +10,68 @@ media_player template for Home Assistant
 
 [![Community Forum][forum-shield]][forum]
 
+## Configuration
 
+This media player has to be configured at your configuration.yaml file.
+YAML keys surrounded by brackets "[]" have to be replaced.
 
-Current implemented features:
-* on_action
-* off_action
-* play_action
-* stop_action
-* pause_action
-* next_action
-* previous_action
-* volume_up_action
-* volume_down_action
-* mute_action
-* source list
-* current source
-* title
-* artist
-* album
-* current volume
-* set_volume action
-* play_media action (not tested)
-* media_content_type_template
-* media_image_url_template
-* media_episode_template
-* media_season_template
-* media_series_title_template
-* media_album_artist_template
-* current_is_muted_template
-* device_class
+There are two ways to configure the media player sources which can be selected.
+* Using inputs which enables you to define scripts for each input (e.g. Switch TV to input "HDMI1", turn on bluray player, etc.)
+* Using a default sources list and a single action to handle the source selection (for example when the template media player is used to combine differend extisting media players in HA)
 
-media_content_type_template can be one of the following values:
-* tv_show
-* music
-* movie
-* video
-
-based on this value other parameters are shown ex artist is only shown when type is music
-
-## Variables used:
-set_volume:
-* {volume}
-
-mute:
-* {is_muted}
-
-play_media:
-* {media_type}
-* {media_id}
-
-## Preview config:
 
 ```yaml
-media_player:
+media_players:
   - platform: media_player_template
     media_players:
-      receiver:
-        friendly_name: Receiver
+      [media_player_entity_id]:
+        # static configuration
+        unique_id: # a UUID to enable HA UI to configure the entity and enable voice assistant UI.
+        friendly_name: "My media player" # This is the displayed entity name
         device_class: receiver
-        current_source_template: "{{ states('input_text.selected_source') }}"
-        value_template: >
-          {% if is_state("input_boolean.receiver_on", "on") -%}
-            on
-          {%- else -%}
-            off
-          {%- endif %}
-        turn_on:
-          service: switch.turn_on
-          data_template:
-            entity_id: switch.receiver_on
-        turn_off:
-          service: switch.turn_on
-          data_template:
-            entity_id: switch.receiver_off
-        volume_up:
-          service: switch.turn_on
-          data_template:
-            entity_id: switch.volume_up
-        volume_down:
-          service: switch.turn_on
-          data_template:
-            entity_id: switch.vol
+        
+        # Templates
+        availability_template: "" # Availability information
+        media_content_type_template: "" # Content type of playing media (valid template results: music, movie, video, tv_show)
+        title_template: "" # Title of playing media
+        artist_template: "" # Artist of playing media
+        album_template: "" # Album name of playing media
+        album_art_template: "" # Album art of playing media
+        media_image_url_template: "" # Media image URL
+        media_episode_template: "" # Episode title of playing media
+        media_season_template: "" # Season title of playing media
+        media_series_title_template: "" # Series title of playing media
+        media_album_artist_template: "" # Album artist of playing media
+        current_volume_template: "" # Current playback position
+        current_is_muted_template: "" # Boolean value if player is muted or not
+        current_source_template: "" # Currently selected source
+        source_list_template: "" # Source list (will enable select_source action and overrides inputs configuration)
+        sound_modes: "" # List of available sound modes
+        current_sound_mode_template: "" # Current sound mode
+        current_position_template: "" # Current playback position
+        media_duration_template: "" # Media duration
+        
+        # Inputs (only if you are not using source_list_template)
         inputs:
-          source 1:
-            service: input_boolean.turn_on
-            data_template:
-              entity_id: input_boolean.source_1
-          source 2:
-            service: input_boolean.turn_on
-            data_template:
-              entity_id: input_boolean.source_2
-        set_volume:
-          service: input_text.set_value
-          data:
-            entity_id: input_text.selected_volume
-            value: "{{volume}}"
-        mute:
-          service: input_number.set_value
-          data:
-            entity_id: input_number.selected_is_muted
-            value: "{{is_muted}}"
-        current_is_muted_template: >
-          {{ states('input_boolean.is_muted') }}
-        album_art_template: "{{ states('input_text.album_art') }}"
-        title_template: "{{ states('input_text.title') }}"
-        album_template: "{{ states('input_text.album') }}"
-        artist_template: "{{ states('input_text.artist') }}"
+          [source_name_1]: # Script to be executed in case of selecting it
+          [source_name_2]: # Script to be executed in case of selecting it
+          [Source_name_N]: # Script to be executed in case of selecting it
+
+        # Actions - all of the following configurations are scripts
+        turn_on: # Turn on the player
+        turn_off: # Turn off the player
+        play: # Start playback
+        pause: # Pause playback
+        stop: # Stop playback
+        previous: # Jump to previous track
+        next: # Jump to next track
+        seek: # Seek to playback position (Variable: position)
+        play_media: # Play a media url (Variables: media_type, media_id)
+        volume_down: # Decrease volume
+        volume_up: # Increase volume
+        set_volume: # Set volume to (Variable: volume)
+        mute: # Mute or unmute the player (Variable: is_muted)
+        select_source: # Select a source (only used when you are using source_list_template, variable: source)
 ```
 
 [commits-shield]: https://img.shields.io/github/commit-activity/m/Sennevds/media_player.template?style=for-the-badge

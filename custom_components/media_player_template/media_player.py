@@ -76,7 +76,9 @@ PREVIOUS_ACTION = "previous"
 VOLUME_UP_ACTION = "volume_up"
 VOLUME_DOWN_ACTION = "volume_down"
 MUTE_ACTION = "mute"
+SELECT_SOURCE_ACTION = "select_source"
 CURRENT_SOURCE_TEMPLATE = "current_source_template"
+SOURCE_LIST_TEMPLATE = "source_list_template"
 CONF_INPUTS = "inputs"
 TITLE_TEMPLATE = "title_template"
 ARTIST_TEMPLATE = "artist_template"
@@ -109,6 +111,7 @@ MEDIA_PLAYER_SCHEMA = vol.Schema(
         vol.Optional(CONF_ENTITY_PICTURE_TEMPLATE): cv.template,
         vol.Optional(CONF_AVAILABILITY_TEMPLATE): cv.template,
         vol.Optional(CURRENT_SOURCE_TEMPLATE): cv.template,
+        vol.Optional(SOURCE_LIST_TEMPLATE): cv.template,
         vol.Optional(ON_ACTION): cv.SCRIPT_SCHEMA,
         vol.Optional(OFF_ACTION): cv.SCRIPT_SCHEMA,
         vol.Optional(PLAY_ACTION): cv.SCRIPT_SCHEMA,
@@ -119,6 +122,7 @@ MEDIA_PLAYER_SCHEMA = vol.Schema(
         vol.Optional(VOLUME_UP_ACTION): cv.SCRIPT_SCHEMA,
         vol.Optional(VOLUME_DOWN_ACTION): cv.SCRIPT_SCHEMA,
         vol.Optional(MUTE_ACTION): cv.SCRIPT_SCHEMA,
+        vol.Optional(SELECT_SOURCE_ACTION): cv.SCRIPT_SCHEMA,
         vol.Optional(CONF_INPUTS, default={}): {cv.string: cv.SCRIPT_SCHEMA},
         vol.Optional(ATTR_FRIENDLY_NAME): cv.string,
         vol.Optional(ATTR_ENTITY_ID): cv.entity_ids,
@@ -169,6 +173,7 @@ async def _async_create_entities(hass, config):
         entity_picture_template = device_config.get(CONF_ENTITY_PICTURE_TEMPLATE)
         availability_template = device_config.get(CONF_AVAILABILITY_TEMPLATE)
         current_source_template = device_config.get(CURRENT_SOURCE_TEMPLATE)
+        source_list_template = device_config.get(SOURCE_LIST_TEMPLATE)
         on_action = device_config.get(ON_ACTION)
         off_action = device_config.get(OFF_ACTION)
         play_action = device_config.get(PLAY_ACTION)
@@ -179,6 +184,7 @@ async def _async_create_entities(hass, config):
         volume_up_action = device_config.get(VOLUME_UP_ACTION)
         volume_down_action = device_config.get(VOLUME_DOWN_ACTION)
         mute_action = device_config.get(MUTE_ACTION)
+        select_source_action = device_config.get(SELECT_SOURCE_ACTION)
         input_templates = device_config[CONF_INPUTS]
         title_template = device_config.get(TITLE_TEMPLATE)
         artist_template = device_config.get(ARTIST_TEMPLATE)
@@ -201,7 +207,7 @@ async def _async_create_entities(hass, config):
         current_sound_mode_template = device_config.get(CURRENT_SOUND_MODE_TEMPLATE)
 
         media_players.append(
-            MediaPlayerTemplate(
+            MediaPlayerTemplateDaxi(
                 hass,
                 device,
                 friendly_name,
@@ -212,6 +218,7 @@ async def _async_create_entities(hass, config):
                 entity_picture_template,
                 availability_template,
                 current_source_template,
+                source_list_template,
                 on_action,
                 off_action,
                 play_action,
@@ -222,6 +229,7 @@ async def _async_create_entities(hass, config):
                 volume_up_action,
                 volume_down_action,
                 mute_action,
+                select_source_action,
                 input_templates,
                 title_template,
                 artist_template,
@@ -247,7 +255,7 @@ async def _async_create_entities(hass, config):
     return media_players
 
 
-class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
+class MediaPlayerTemplateDaxi(TemplateEntity, MediaPlayerEntity):
     """Representation of a Template Media player."""
 
     def __init__(
@@ -262,6 +270,7 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         entity_picture_template,
         availability_template,
         current_source_template,
+        source_list_template,
         on_action,
         off_action,
         play_action,
@@ -272,6 +281,7 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         volume_up_action,
         volume_down_action,
         mute_action,
+        select_source_action,
         input_templates,
         title_template,
         artist_template,
@@ -355,6 +365,10 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         if mute_action is not None:
             self._mute_script = Script(hass, mute_action, friendly_name, self._domain)
 
+        self._select_source_script = None
+        if select_source_action is not None:
+            self._select_source_script = Script(hass, select_source_action, friendly_name, self._domain)
+
         self._set_volume_script = None
         if set_volume_action is not None:
             self._set_volume_script = Script(
@@ -379,6 +393,7 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         self._available = True
         self._input_templates = input_templates
         self._current_source_template = current_source_template
+        self._source_list_template = source_list_template
         self._current_source = None
         self._source_list = list(input_templates.keys())
         self._attributes = {}
@@ -426,6 +441,11 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         if self._current_source_template is not None:
             self.add_template_attribute(
                 "_current_source", self._current_source_template
+            )
+
+        if self._source_list_template is not None:
+            self.add_template_attribute(
+                "_source_list", self._source_list_template
             )
 
         if self._title_template is not None:
@@ -489,7 +509,7 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
     def name(self):
         """Return the name of the switch."""
         return self._name
-    
+
     @property
     def device_class(self):
         """Return the class of this device."""
@@ -538,7 +558,10 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
             support |= SUPPORT_VOLUME_STEP
         if self._mute_script is not None:
             support |= SUPPORT_VOLUME_MUTE
-        if self._source_list is not None:
+        if self._source_list is not None or (
+            self._source_list_template is not None
+            and self._select_source_script is not None
+        ):
             support |= SUPPORT_SELECT_SOURCE
         if self._set_volume_script is not None:
             support |= SUPPORT_VOLUME_SET
@@ -755,7 +778,11 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
 
     async def async_select_source(self, source):
         """Set the input source."""
-        if source in self._input_templates:
+        if source in self._source_list:
+            await self._select_source_script.async_run(
+                {"source": source}, context=self._context
+            )
+        elif source in self._input_templates:
             source_script = Script(
                 self.hass, self._input_templates[source], self._name, self._domain
             )
