@@ -1,4 +1,4 @@
-"""Support for switches which integrates with other components."""
+ """Support for switches which integrates with other components."""
 import logging
 
 import homeassistant.helpers.config_validation as cv
@@ -174,8 +174,8 @@ async def _async_create_entities(hass, config):
         current_source_template = device_config.get(CURRENT_SOURCE_TEMPLATE)
         on_action = device_config[ON_ACTION]
         off_action = device_config[OFF_ACTION]
-        play_action = device_config.get(PLAY_PAUSE_ACTION)
-        play_pause_action = device_config.get(PLAY_ACTION)
+        play_action = device_config.get(PLAY_ACTION)
+        play_pause_action = device_config.get(PLAY_PAUSE_ACTION)
         stop_action = device_config.get(STOP_ACTION)
         pause_action = device_config.get(PAUSE_ACTION)
         next_action = device_config.get(NEXT_ACTION)
