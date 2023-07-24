@@ -1,4 +1,3 @@
- """Support for switches which integrates with other components."""
 import logging
 
 import homeassistant.helpers.config_validation as cv
