@@ -69,6 +69,7 @@ CONF_MEDIAPLAYER = "media_players"
 ON_ACTION = "turn_on"
 OFF_ACTION = "turn_off"
 PLAY_ACTION = "play"
+PLAY_PAUSE_ACTION = "play_pause"
 STOP_ACTION = "stop"
 PAUSE_ACTION = "pause"
 NEXT_ACTION = "next"
@@ -109,9 +110,10 @@ MEDIA_PLAYER_SCHEMA = vol.Schema(
         vol.Optional(CONF_ENTITY_PICTURE_TEMPLATE): cv.template,
         vol.Optional(CONF_AVAILABILITY_TEMPLATE): cv.template,
         vol.Optional(CURRENT_SOURCE_TEMPLATE): cv.template,
-        vol.Optional(ON_ACTION): cv.SCRIPT_SCHEMA,
-        vol.Optional(OFF_ACTION): cv.SCRIPT_SCHEMA,
+        vol.Required(ON_ACTION): cv.SCRIPT_SCHEMA,
+        vol.Required(OFF_ACTION): cv.SCRIPT_SCHEMA,
         vol.Optional(PLAY_ACTION): cv.SCRIPT_SCHEMA,
+        vol.Optional(PLAY_PAUSE_ACTION): cv.SCRIPT_SCHEMA,
         vol.Optional(STOP_ACTION): cv.SCRIPT_SCHEMA,
         vol.Optional(PAUSE_ACTION): cv.SCRIPT_SCHEMA,
         vol.Optional(NEXT_ACTION): cv.SCRIPT_SCHEMA,
@@ -143,6 +145,7 @@ MEDIA_PLAYER_SCHEMA = vol.Schema(
         vol.Optional(CURRENT_SOUND_MODE_TEMPLATE): cv.template,
     }
 )
+SUPPORT_TEMPLATE = SUPPORT_TURN_OFF | SUPPORT_TURN_ON
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {vol.Required(CONF_MEDIAPLAYER): cv.schema_with_slug_keys(MEDIA_PLAYER_SCHEMA)}
@@ -169,9 +172,10 @@ async def _async_create_entities(hass, config):
         entity_picture_template = device_config.get(CONF_ENTITY_PICTURE_TEMPLATE)
         availability_template = device_config.get(CONF_AVAILABILITY_TEMPLATE)
         current_source_template = device_config.get(CURRENT_SOURCE_TEMPLATE)
-        on_action = device_config.get(ON_ACTION)
-        off_action = device_config.get(OFF_ACTION)
-        play_action = device_config.get(PLAY_ACTION)
+        on_action = device_config[ON_ACTION]
+        off_action = device_config[OFF_ACTION]
+        play_action = device_config.get(PLAY_PAUSE_ACTION)
+        play_pause_action = device_config.get(PLAY_ACTION)
         stop_action = device_config.get(STOP_ACTION)
         pause_action = device_config.get(PAUSE_ACTION)
         next_action = device_config.get(NEXT_ACTION)
@@ -215,6 +219,7 @@ async def _async_create_entities(hass, config):
                 on_action,
                 off_action,
                 play_action,
+                play_pause_action,
                 stop_action,
                 pause_action,
                 next_action,
@@ -265,6 +270,7 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         on_action,
         off_action,
         play_action,
+        play_pause_action,
         stop_action,
         pause_action,
         next_action,
@@ -308,18 +314,15 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         self._device_class = device_class
         self._template = state_template
         self._domain = __name__.split(".")[-2]
-
-        self._on_script = None
-        if on_action is not None:
-            self._on_script = Script(hass, on_action, friendly_name, self._domain)
-
-        self._off_script = None
-        if off_action is not None:
-            self._off_script = Script(hass, off_action, friendly_name, self._domain)
-
+        self._on_script = Script(hass, on_action, friendly_name, self._domain)
+        self._off_script = Script(hass, off_action, friendly_name, self._domain)
         self._play_script = None
         if play_action is not None:
             self._play_script = Script(hass, play_action, friendly_name, self._domain)
+
+        self._stop_script = None
+        if play_pause_action is not None:
+            self._play_script = Script(hass, play_pause_action, friendly_name, self._domain)
 
         self._stop_script = None
         if stop_action is not None:
@@ -519,11 +522,7 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
     def supported_features(self):
         """Flag media player features that are supported."""
 
-        support = 0
-        if self._on_script is not None:
-            support |= SUPPORT_TURN_ON
-        if self._off_script is not None:
-            support |= SUPPORT_TURN_OFF
+        support = SUPPORT_TEMPLATE
         if self._play_script is not None:
             support |= SUPPORT_PLAY
         if self._stop_script is not None:
