@@ -1,5 +1,5 @@
 {
   "name": "Media player template",
-  "homeassistant": "0.117",
+  "homeassistant": "0.116",
   "render_readme": true
 }
