@@ -1,4 +1,7 @@
-"""Support for switches which integrates with other components."""
+"""
+Template for media-player
+https://github.com/Sennevds/media_player.template
+"""
 import logging
 
 import homeassistant.helpers.config_validation as cv
@@ -8,22 +11,8 @@ from homeassistant.components.media_player import (
     ENTITY_ID_FORMAT,
     PLATFORM_SCHEMA,
     MediaPlayerEntity,
-)
-from homeassistant.components.media_player.const import (
-    SUPPORT_NEXT_TRACK,
-    SUPPORT_PAUSE,
-    SUPPORT_PLAY,
-    SUPPORT_PLAY_MEDIA,
-    SUPPORT_PREVIOUS_TRACK,
-    SUPPORT_SEEK,
-    SUPPORT_SELECT_SOUND_MODE,
-    SUPPORT_SELECT_SOURCE,
-    SUPPORT_STOP,
-    SUPPORT_TURN_OFF,
-    SUPPORT_TURN_ON,
-    SUPPORT_VOLUME_MUTE,
-    SUPPORT_VOLUME_SET,
-    SUPPORT_VOLUME_STEP,
+    MediaPlayerEntityFeature,
+    MediaPlayerState,
 )
 from homeassistant.components.template.const import (
     CONF_AVAILABILITY_TEMPLATE,
@@ -37,12 +26,8 @@ from homeassistant.const import (
     CONF_DEVICE_CLASS,
     CONF_ENTITY_PICTURE_TEMPLATE,
     CONF_ICON_TEMPLATE,
+    CONF_UNIQUE_ID,
     CONF_VALUE_TEMPLATE,
-    STATE_IDLE,
-    STATE_OFF,
-    STATE_ON,
-    STATE_PAUSED,
-    STATE_PLAYING,
     STATE_UNKNOWN,
 )
 from homeassistant.core import callback
@@ -51,18 +36,15 @@ from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.reload import async_setup_reload_service
 from homeassistant.helpers.script import Script
 
-# from . import extract_entities, initialise_templates
-
-
 _LOGGER = logging.getLogger(__name__)
 _VALID_STATES = [
-    STATE_ON,
-    STATE_OFF,
+    MediaPlayerState.ON,
+    MediaPlayerState.OFF,
     "true",
     "false",
-    STATE_IDLE,
-    STATE_PAUSED,
-    STATE_PLAYING,
+    MediaPlayerState.IDLE,
+    MediaPlayerState.PAUSED,
+    MediaPlayerState.PLAYING,
 ]
 CONF_AVAILABILITY_TEMPLATE = "availability_template"
 CONF_MEDIAPLAYER = "media_players"
@@ -97,7 +79,6 @@ CURRENT_POSITION_TEMPLATE = "current_position_template"
 MEDIA_DURATION_TEMPLATE = "media_duration_template"
 CURRENT_SOUND_MODE_TEMPLATE = "current_sound_mode_template"
 CONF_SOUND_MODES = "sound_modes"
-CONF_UNIQUE_ID = "unique_id"
 
 
 MEDIA_PLAYER_SCHEMA = vol.Schema(
@@ -150,14 +131,14 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
 
 
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
-    """Set up the template binary sensors."""
+    """Set up platform."""
 
     await async_setup_reload_service(hass, DOMAIN, PLATFORMS)
     async_add_entities(await _async_create_entities(hass, config))
 
 
 async def _async_create_entities(hass, config):
-    """Set up the Template switch."""
+    """Set up entities."""
     media_players = []
 
     for device, device_config in config[CONF_MEDIAPLAYER].items():
@@ -489,7 +470,7 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
     def name(self):
         """Return the name of the switch."""
         return self._name
-    
+
     @property
     def device_class(self):
         """Return the class of this device."""
@@ -521,33 +502,33 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
 
         support = 0
         if self._on_script is not None:
-            support |= SUPPORT_TURN_ON
+            support |= MediaPlayerEntityFeature.TURN_ON
         if self._off_script is not None:
-            support |= SUPPORT_TURN_OFF
+            support |= MediaPlayerEntityFeature.TURN_OFF
         if self._play_script is not None:
-            support |= SUPPORT_PLAY
+            support |= MediaPlayerEntityFeature.PLAY
         if self._stop_script is not None:
-            support |= SUPPORT_STOP
+            support |= MediaPlayerEntityFeature.STOP
         if self._pause_script is not None:
-            support |= SUPPORT_PAUSE
+            support |= MediaPlayerEntityFeature.PAUSE
         if self._next_script is not None:
-            support |= SUPPORT_NEXT_TRACK
+            support |= MediaPlayerEntityFeature.NEXT_TRACK
         if self._previous_script is not None:
-            support |= SUPPORT_PREVIOUS_TRACK
+            support |= MediaPlayerEntityFeature.PREVIOUS_TRACK
         if self._volume_up_script is not None or self._volume_down_script is not None:
-            support |= SUPPORT_VOLUME_STEP
+            support |= MediaPlayerEntityFeature.VOLUME_STEP
         if self._mute_script is not None:
-            support |= SUPPORT_VOLUME_MUTE
+            support |= MediaPlayerEntityFeature.VOLUME_MUTE
         if self._source_list is not None:
-            support |= SUPPORT_SELECT_SOURCE
+            support |= MediaPlayerEntityFeature.SELECT_SOURCE
         if self._set_volume_script is not None:
-            support |= SUPPORT_VOLUME_SET
+            support |= MediaPlayerEntityFeature.VOLUME_SET
         if self._play_media_script is not None:
-            support |= SUPPORT_PLAY_MEDIA
+            support |= MediaPlayerEntityFeature.PLAY_MEDIA
         if self._seek_script is not None:
-            support |= SUPPORT_SEEK
+            support |= MediaPlayerEntityFeature.SEEK
         if self._sound_mode_list is not None:
-            support |= SUPPORT_SELECT_SOUND_MODE
+            support |= MediaPlayerEntityFeature.SELECT_SOUND_MODE
         return support
 
     @property
@@ -583,9 +564,7 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         if self._current_is_muted_template is None:
             self._is_muted = mute
             self.async_write_ha_state()
-        await self._mute_script.async_run(
-            {"is_muted": mute}, context=self._context
-        )
+        await self._mute_script.async_run({"is_muted": mute}, context=self._context)
 
     async def async_media_play(self):
         """Fire the off action."""
@@ -631,16 +610,16 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         if self._state is None:
             return None
         elif self._state == "playing":
-            return STATE_PLAYING
+            return MediaPlayerState.PLAYING
         elif self._state == "paused":
-            return STATE_PAUSED
+            return MediaPlayerState.PAUSED
         elif self._state == "idle":
-            return STATE_IDLE
+            return MediaPlayerState.IDLE
         elif self._state == "on":
-            return STATE_ON
+            return MediaPlayerState.ON
         elif self._state == "off":
-            return STATE_OFF
-        return STATE_OFF
+            return MediaPlayerState.OFF
+        return MediaPlayerState.OFF
 
     @property
     def source(self):
@@ -742,7 +721,7 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         """Return the current input source."""
         try:
             if self._current_sound_mode_template is not None:
-                self._curre = self._current_sound_mode_template.async_render()
+                self._sound_mode = self._current_sound_mode_template.async_render()
             return self._sound_mode
         except TemplateError as ex:
             _LOGGER.error(ex)
