@@ -16,6 +16,7 @@ Current implemented features:
 * on_action
 * off_action
 * play_action
+* play_pause_action
 * stop_action
 * pause_action
 * next_action
