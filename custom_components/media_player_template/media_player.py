@@ -468,7 +468,7 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
 
     @property
     def name(self):
-        """Return the name of the switch."""
+        """Return the name of the media player."""
         return self._name
 
     @property
@@ -552,11 +552,11 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         await self._off_script.async_run(context=self._context)
 
     async def async_volume_up(self):
-        """Fire the off action."""
+        """Fire the volume up action."""
         await self._volume_up_script.async_run(context=self._context)
 
     async def async_volume_down(self):
-        """Fire the off action."""
+        """Fire the volume down action."""
         await self._volume_down_script.async_run(context=self._context)
 
     async def async_mute_volume(self, mute):
@@ -567,14 +567,15 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         await self._mute_script.async_run({"is_muted": mute}, context=self._context)
 
     async def async_media_play(self):
-        """Fire the off action."""
+        """Fire the play action."""
         await self._play_script.async_run(context=self._context)
 
     async def async_media_stop(self):
+        """Fire the stop action."""
         await self._stop_script.async_run(context=self._context)
 
     async def async_media_pause(self):
-        """Fire the off action."""
+        """Fire the pause action."""
         await self._pause_script.async_run(context=self._context)
 
     async def async_media_next_track(self):
