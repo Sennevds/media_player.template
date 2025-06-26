@@ -70,6 +70,7 @@ SET_VOLUME_ACTION = "set_volume"
 PLAY_MEDIA_ACTION = "play_media"
 MEDIA_CONTENT_TYPE_TEMPLATE = "media_content_type_template"
 MEDIA_IMAGE_URL_TEMPLATE = "media_image_url_template"
+MEDIA_IMAGE_URL_REMOTELY_ACCESSIBLE = "media_image_url_remotely_accessible"
 MEDIA_EPISODE_TEMPLATE = "media_episode_template"
 MEDIA_SEASON_TEMPLATE = "media_season_template"
 MEDIA_SERIES_TITLE_TEMPLATE = "media_series_title_template"
@@ -113,6 +114,7 @@ MEDIA_PLAYER_SCHEMA = vol.Schema(
         vol.Optional(ALBUM_ART_TEMPLATE): cv.template,
         vol.Optional(MEDIA_CONTENT_TYPE_TEMPLATE): cv.template,
         vol.Optional(MEDIA_IMAGE_URL_TEMPLATE): cv.template,
+        vol.Optional(MEDIA_IMAGE_URL_REMOTELY_ACCESSIBLE): cv.boolean,
         vol.Optional(MEDIA_EPISODE_TEMPLATE): cv.template,
         vol.Optional(MEDIA_SEASON_TEMPLATE): cv.template,
         vol.Optional(MEDIA_SERIES_TITLE_TEMPLATE): cv.template,
@@ -171,6 +173,7 @@ async def _async_create_entities(hass, config):
         play_media_action = device_config.get(PLAY_MEDIA_ACTION)
         media_content_type_template = device_config.get(MEDIA_CONTENT_TYPE_TEMPLATE)
         media_image_url_template = device_config.get(MEDIA_IMAGE_URL_TEMPLATE)
+        media_image_url_remotely_accessible = device_config.get(MEDIA_IMAGE_URL_REMOTELY_ACCESSIBLE)
         media_episode_template = device_config.get(MEDIA_EPISODE_TEMPLATE)
         media_season_template = device_config.get(MEDIA_SEASON_TEMPLATE)
         media_series_title_template = device_config.get(MEDIA_SERIES_TITLE_TEMPLATE)
@@ -214,6 +217,7 @@ async def _async_create_entities(hass, config):
                 play_media_action,
                 media_content_type_template,
                 media_image_url_template,
+                media_image_url_remotely_accessible,
                 media_episode_template,
                 media_season_template,
                 media_series_title_template,
@@ -264,6 +268,7 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         play_media_action,
         media_content_type_template,
         media_image_url_template,
+        media_image_url_remotely_accessible,
         media_episode_template,
         media_season_template,
         media_series_title_template,
@@ -371,6 +376,7 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         self._album_art_template = album_art_template
         self._media_content_type_template = media_content_type_template
         self._media_image_url_template = media_image_url_template
+        self._media_image_url_remotely_accessible = media_image_url_remotely_accessible
         self._media_episode_template = media_episode_template
         self._media_season_template = media_season_template
         self._media_series_title_template = media_series_title_template
@@ -490,11 +496,6 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
     def icon(self):
         """Return the icon to use in the frontend, if any."""
         return self._icon
-
-    @property
-    def entity_picture(self):
-        """Return the entity_picture to use in the frontend, if any."""
-        return self._entity_picture
 
     @property
     def supported_features(self):
@@ -701,7 +702,7 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
     @property
     def media_image_remotely_accessible(self) -> bool:
         """If the image url is remotely accessible."""
-        return True
+        return self._media_image_url_remotely_accessible
 
     @property
     def media_position(self):
