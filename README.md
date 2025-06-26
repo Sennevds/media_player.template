@@ -1,4 +1,5 @@
 # media_player.template
+
 media_player template for Home Assistant
 
 [![GitHub Release][releases-shield]][releases]
@@ -10,55 +11,60 @@ media_player template for Home Assistant
 
 [![Community Forum][forum-shield]][forum]
 
-
-
 Current implemented features:
-* on_action
-* off_action
-* play_action
-* play_pause_action
-* stop_action
-* pause_action
-* next_action
-* previous_action
-* volume_up_action
-* volume_down_action
-* mute_action
-* source list
-* current source
-* title
-* artist
-* album
-* current volume
-* set_volume action
-* play_media action (not tested)
-* media_content_type_template
-* media_image_url_template
-* media_episode_template
-* media_season_template
-* media_series_title_template
-* media_album_artist_template
-* current_is_muted_template
-* device_class
+
+- on_action
+- off_action
+- play_action
+- play_pause_action
+- stop_action
+- pause_action
+- next_action
+- previous_action
+- volume_up_action
+- volume_down_action
+- mute_action
+- source list
+- current source
+- title
+- artist
+- album
+- current volume
+- set_volume action
+- play_media action (not tested)
+- media_content_type_template
+- media_image_url_template
+- media_image_url_remotely_accessible
+- media_episode_template
+- media_season_template
+- media_series_title_template
+- media_album_artist_template
+- current_is_muted_template
+- device_class
 
 media_content_type_template can be one of the following values:
-* tv_show
-* music
-* movie
-* video
+
+- tv_show
+- music
+- movie
+- video
 
 based on this value other parameters are shown ex artist is only shown when type is music
 
 ## Variables used:
+
 set_volume:
-* {volume}
+
+- {volume}
 
 mute:
-* {is_muted}
+
+- {is_muted}
 
 play_media:
-* {media_type}
-* {media_id}
+
+- {media_type}
+- {media_id}
 
 ## Preview config:
 
