@@ -87,7 +87,7 @@ MEDIA_PLAYER_SCHEMA = vol.Schema(
         vol.Required(CONF_VALUE_TEMPLATE): cv.template,
         vol.Optional(CONF_ICON_TEMPLATE): cv.template,
         vol.Optional(CONF_DEVICE_CLASS): cv.string,
-        vol.Required(CONF_UNIQUE_ID): cv.string,
+        vol.Optional(CONF_UNIQUE_ID): cv.string,
         vol.Optional(CONF_ENTITY_PICTURE_TEMPLATE): cv.template,
         vol.Optional(CONF_AVAILABILITY_TEMPLATE): cv.template,
         vol.Optional(CURRENT_SOURCE_TEMPLATE): cv.template,
@@ -148,7 +148,7 @@ async def _async_create_entities(hass, config):
         device_class = device_config.get(CONF_DEVICE_CLASS, device)
         state_template = device_config[CONF_VALUE_TEMPLATE]
         icon_template = device_config.get(CONF_ICON_TEMPLATE)
-        unique_id = device_config.get(CONF_UNIQUE_ID)
+        unique_id = device_config.get(CONF_UNIQUE_ID) or device
         entity_picture_template = device_config.get(CONF_ENTITY_PICTURE_TEMPLATE)
         availability_template = device_config.get(CONF_AVAILABILITY_TEMPLATE)
         current_source_template = device_config.get(CURRENT_SOURCE_TEMPLATE)
