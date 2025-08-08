@@ -87,7 +87,7 @@ MEDIA_PLAYER_SCHEMA = vol.Schema(
         vol.Required(CONF_VALUE_TEMPLATE): cv.template,
         vol.Optional(CONF_ICON_TEMPLATE): cv.template,
         vol.Optional(CONF_DEVICE_CLASS): cv.string,
-        vol.Optional(CONF_UNIQUE_ID): cv.string,
+        vol.Required(CONF_UNIQUE_ID): cv.string,
         vol.Optional(CONF_ENTITY_PICTURE_TEMPLATE): cv.template,
         vol.Optional(CONF_AVAILABILITY_TEMPLATE): cv.template,
         vol.Optional(CURRENT_SOURCE_TEMPLATE): cv.template,
@@ -282,9 +282,12 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
         """Initialize the Template Media player."""
         super().__init__(
             hass,
-            availability_template=availability_template,
-            icon_template=icon_template,
-            entity_picture_template=entity_picture_template,
+            {
+                "availability_template": availability_template,
+                "icon_template": icon_template,
+                "entity_picture_template": entity_picture_template,
+            },
+            unique_id,
         )
         self.hass = hass
         self.entity_id = async_generate_entity_id(
@@ -358,9 +361,7 @@ class MediaPlayerTemplate(TemplateEntity, MediaPlayerEntity):
 
         self._state = False
         self._icon = None
-        self._unique_id = None
-        if unique_id is not None:
-            self._unique_id = unique_id
+        self._unique_id = unique_id
         self._entity_picture = None
         self._available = True
         self._input_templates = input_templates
